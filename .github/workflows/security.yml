@@ -1,0 +1,40 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # GitHub Actions SHA-pinning gate, via the geolonia/.github reusable. It reads
+  # this repo's .pinact.yml (7-day min_age, own-org exemptions).
+  action-pinning:
+    permissions:
+      contents: read
+    uses: geolonia/.github/.github/workflows/reusable-pinact-check.yml@82a98a9b4b4f75f1f064a85a7ebc720bbcc953f5 # v1
+
+  # GitHub Actions static analysis (dangerous triggers, template injection,
+  # excessive permissions, credential persistence).
+  zizmor:
+    name: zizmor (GitHub Actions audit)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
+        with:
+          # SARIF upload needs GitHub Advanced Security (not on private repos
+          # without a license); use workflow annotations instead so behavior is
+          # identical on public and private repos.
+          advanced-security: false
+          annotations: true
+          version: "1.26.1"

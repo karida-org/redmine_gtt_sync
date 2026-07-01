@@ -1,0 +1,26 @@
+# Dependabot keeps GitHub Actions SHA pins current: it bumps both the commit
+# SHA and the trailing version comment, so SHA-pinning never goes stale. Pairs
+# with the Action Pinning Check (pinact) CI gate and the repo .pinact.yml
+# minimum release age.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Defer brand-new releases. One day longer than .pinact.yml's 7-day
+    # min_age: Dependabot counts calendar days while pinact enforces an exact
+    # 168h floor, so an 8-day cooldown guarantees a Dependabot PR always clears
+    # the pinact gate on arrival.
+    cooldown:
+      default-days: 8
+    groups:
+      # Batch minor and patch bumps into one weekly PR. Majors are excluded, so
+      # breaking upgrades arrive as isolated PRs. Security updates also stay
+      # individual (groups defaults to applies-to: version-updates).
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
