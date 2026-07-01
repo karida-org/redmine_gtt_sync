@@ -1,0 +1,11 @@
+# Pin GitHub Actions to SHAs (same engine + .pinact.yml as the CI gate).
+# Requires pinact on PATH: `brew install pinact` (tap suzuki-shunsuke/pinact).
+repos:
+  - repo: local
+    hooks:
+      - id: pinact
+        name: pinact (pin GitHub Actions)
+        entry: pinact run
+        language: system
+        files: (^\.github/workflows/.*\.ya?ml$|(^|/)action\.ya?ml$)
+        pass_filenames: false

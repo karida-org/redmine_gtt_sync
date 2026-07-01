@@ -1,0 +1,24 @@
+# pinact config (read locally by the pre-commit hook and in CI by the
+# geolonia/.github Action Pinning Check). Mirrors the geolonia org standard.
+#
+#   min_age.value: 7     Do not pin (or update to) an action release younger
+#                        than 7 days. A freshly published tag is the window
+#                        when a hijacked-tag supply-chain attack is most likely
+#                        still live, so we wait it out.
+#   min_age.always: true Enforce the age of current pins on every run.
+#
+#   rules               Exempt our own orgs (and geolonia, whose reusable
+#                       workflows we consume) from the cooldown and SHA-pin
+#                       requirement: we author and control those releases and
+#                       reference them by major tag. Third-party actions
+#                       (checkout, zizmor-action, pinact-action) stay SHA-pinned
+#                       and age-checked. Dependabot maintains the pinned SHAs.
+version: 3
+min_age:
+  value: 7
+  always: true
+rules:
+  - min_age: 0
+    conditions:
+      - expr: |
+          ActionName matches "(geolonia|karida-org|gtt-project)/.*"
