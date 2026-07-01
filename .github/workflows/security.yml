@@ -17,7 +17,7 @@ jobs:
   action-pinning:
     permissions:
       contents: read
-    uses: geolonia/.github/.github/workflows/reusable-pinact-check.yml@82a98a9b4b4f75f1f064a85a7ebc720bbcc953f5 # v1
+    uses: geolonia/.github/.github/workflows/reusable-pinact-check.yml@82a98a9b4b4f75f1f064a85a7ebc720bbcc953f5 # v1.28.0
 
   # GitHub Actions static analysis (dangerous triggers, template injection,
   # excessive permissions, credential persistence).
@@ -27,7 +27,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
       - uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
