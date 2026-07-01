@@ -1,0 +1,7 @@
+*.rbc
+*.log
+.DS_Store
+/coverage/
+/tmp/
+/.bundle/
+Gemfile.lock
