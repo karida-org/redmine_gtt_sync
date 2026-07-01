@@ -21,11 +21,19 @@ jobs:
     name: redmine:${{ matrix.redmine_version }} ruby:${{ matrix.ruby_version }} postgis:${{ matrix.db_version }}
     runs-on: ubuntu-latest
 
+    env:
+      # Redmine 7 (Rails 8.1) needs the 8.1 geo gem stack, driven per-row via
+      # redmine_gtt's GEM_* env vars; 6.x stays on the Gemfile defaults.
+      GEM_RGEO_VERSION: ${{ matrix.rgeo || '3.0.1' }}
+      GEM_RGEO_ACTIVERECORD_VERSION: ${{ matrix.rgeo_ar || '8.0.0' }}
+      GEM_ACTIVERECORD_POSTGIS_ADAPTER_VERSION: ${{ matrix.postgis_adapter || '10.0.0' }}
+
     strategy:
       fail-fast: false
       matrix:
         include:
           - { redmine_version: 6.1-stable, ruby_version: "3.4", db_version: 18-3.6 }
+          - { redmine_version: 7.0-stable, ruby_version: "4.0", db_version: 18-3.6, rgeo: "3.1.0", rgeo_ar: "8.1.0", postgis_adapter: "11.1.0" }
 
     services:
       postgres:
