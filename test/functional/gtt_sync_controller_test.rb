@@ -40,4 +40,28 @@ class GttSyncControllerTest < ActionController::TestCase
     end
     assert_response :not_found
   end
+
+  test 'schema exposes trackers, statuses, custom fields, and writable fields' do
+    field = IssueCustomField.create!(
+      name: 'Severity', field_format: 'list',
+      possible_values: %w[Low Medium High], is_for_all: true
+    )
+    field.trackers = Tracker.all
+
+    @request.session[:user_id] = 1
+    get :project_schema, params: { id: 'ecookbook' }
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert body['trackers'].any?
+    assert body['statuses'].any?
+    assert_includes body['writable'], 'subject'
+    assert_includes body['writable'], 'geojson'
+    assert(body['custom_fields'].any? { |cf| cf['name'] == 'Severity' })
+  end
+
+  test 'schema returns 404 for an unknown project' do
+    @request.session[:user_id] = 1
+    get :project_schema, params: { id: 'no-such-project' }
+    assert_response :not_found
+  end
 end

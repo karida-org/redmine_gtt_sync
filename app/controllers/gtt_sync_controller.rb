@@ -8,7 +8,7 @@ class GttSyncController < ApplicationController
   # the server offers before it has credentials. The issue document is real
   # data, so it stays behind login + visibility.
   skip_before_action :check_if_login_required, only: [:capabilities]
-  accept_api_auth :capabilities, :issue, :project_bundle
+  accept_api_auth :capabilities, :issue, :project_bundle, :project_schema
 
   def capabilities
     render json: RedmineGttSync::Capabilities.report
@@ -29,11 +29,7 @@ class GttSyncController < ApplicationController
   # Whole project in one optimized, permission-scoped payload. Project.visible
   # and Issue.visible enforce the same access control as the rest of Redmine.
   def project_bundle
-    key = params[:id].to_s
-    project = Project.visible.find_by(identifier: key)
-    project ||= Project.visible.find_by(id: key) if key.match?(/\A\d+\z/)
-    raise ActiveRecord::RecordNotFound unless project
-
+    project = find_visible_project(params[:id])
     issues = project.issues.visible.to_a
     render json: RedmineGttSync::ProjectBundle.build(
       project, issues, base_url: canonical_base_url
@@ -42,7 +38,25 @@ class GttSyncController < ApplicationController
     render json: { error: 'Project not found' }, status: :not_found
   end
 
+  # Per-project editing schema (trackers/statuses/custom fields/writable fields)
+  # for the current user.
+  def project_schema
+    project = find_visible_project(params[:id])
+    render json: RedmineGttSync::ProjectSchema.build(project, User.current)
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Project not found' }, status: :not_found
+  end
+
   private
+
+  # Resolve a project by id or identifier within the user's visibility, or raise
+  # RecordNotFound (a hidden project is indistinguishable from a missing one).
+  def find_visible_project(param)
+    key = param.to_s
+    project = Project.visible.find_by(identifier: key)
+    project ||= Project.visible.find_by(id: key) if key.match?(/\A\d+\z/)
+    project || raise(ActiveRecord::RecordNotFound)
+  end
 
   # The instance's canonical origin (not the request host), so IRIs are stable
   # regardless of how the request arrived.

@@ -18,7 +18,7 @@ module RedmineGttSync
       bulk_geometry_write: :gtt_sync_bulk_geometry,
       geometry_only_patch: :gtt_sync_geometry,
       change_feed: :gtt_sync_changes,
-      schema_introspection: :gtt_sync_schema,
+      schema_introspection: :gtt_sync_project_schema,
       ogc_api_features: :gtt_sync_ogc_features,
       wfs_t: :gtt_sync_wfs_transaction
     }.freeze
