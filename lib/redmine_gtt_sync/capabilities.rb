@@ -13,6 +13,7 @@ module RedmineGttSync
     # capability => the named route that implements it. Route names are
     # provisional until each endpoint lands; the detection is what matters.
     CONTRACT_ROUTES = {
+      issue_jsonld: :gtt_sync_issue,
       bulk_geometry_write: :gtt_sync_bulk_geometry,
       geometry_only_patch: :gtt_sync_geometry,
       change_feed: :gtt_sync_changes,
