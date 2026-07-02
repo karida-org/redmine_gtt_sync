@@ -55,14 +55,20 @@ class GttSyncController < ApplicationController
 
   private
 
-  # Governance gate. `allowed_to?(:use_gtt_sync, project)` already encompasses
-  # both the gtt_sync module being enabled on the project (Redmine gates
-  # module-scoped permissions, and even admins don't bypass a disabled module)
-  # and the user's role holding the permission. The project is visible either
-  # way, so this is a 403 (not 404): the client can tell "no integration access"
-  # from "no such project". Composes on top of each action's visibility checks.
+  # Governance gate: integration access requires BOTH
+  # - :use_gtt_sync (which already encompasses the gtt_sync module being enabled:
+  #   Redmine gates module-scoped permissions, and even admins don't bypass a
+  #   disabled module), AND
+  # - :view_issues, since these endpoints expose issue data — a role with
+  #   use_gtt_sync but not view_issues must not receive project/issue payloads.
+  # The project is visible either way, so this is a 403 (not 404). Composes on
+  # top of each action's own visibility scoping.
   def integration_allowed?(project)
-    return true if User.current.allowed_to?(:use_gtt_sync, project)
+    user = User.current
+    if user.allowed_to?(:use_gtt_sync, project) &&
+       user.allowed_to?(:view_issues, project)
+      return true
+    end
 
     render json: {
       error: 'GTT integration is not enabled for this project or your role.'

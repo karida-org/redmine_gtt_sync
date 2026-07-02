@@ -95,4 +95,14 @@ class GttSyncControllerTest < ActionController::TestCase
     get :project_schema, params: { id: 'ecookbook' }
     assert_response :forbidden
   end
+
+  test 'issue is forbidden without integration access' do
+    # Issue 1 is in project 1; the user can view it, but with the module
+    # disabled the integration gate returns 403.
+    project = Project.find(1)
+    project.enabled_module_names = project.enabled_module_names - ['gtt_sync']
+    @request.session[:user_id] = 1
+    get :issue, params: { id: 1 }
+    assert_response :forbidden
+  end
 end
