@@ -72,4 +72,30 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
   def test_no_boundary_is_null
     assert_nil build([], with_boundary: false)['project']['boundary']
   end
+
+  def test_multipart_geometries_map_to_their_base_category
+    f = factory
+    issues = [
+      issue(1, geom: f.multi_point([f.point(0, 0)])),
+      issue(2, geom: f.multi_line_string([f.line_string([f.point(0, 0), f.point(1, 1)])])),
+      issue(3, geom: f.multi_polygon([f.polygon(ring)]))
+    ]
+    bundle = build(issues)
+    ids = ->(category) { bundle['issues'][category]['features'].map { |x| x['id'] } }
+    assert_equal [1], ids.call('point')
+    assert_equal [2], ids.call('line')
+    assert_equal [3], ids.call('polygon')
+    assert_empty bundle['issues']['unplaced']
+  end
+
+  def test_unsupported_geometry_type_falls_back_to_unplaced
+    # A geometry type outside the category map (e.g. GeometryCollection, which
+    # GTT does not produce) can't go in a single-type layer, so it falls to
+    # unplaced rather than being silently dropped. Documents the contract.
+    f = factory
+    bundle = build([issue(1, geom: f.collection([f.point(0, 0)]))])
+    assert_empty bundle['issues']['point']['features']
+    unplaced_ids = bundle['issues']['unplaced'].map { |x| x['id'] }
+    assert_equal [1], unplaced_ids
+  end
 end

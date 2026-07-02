@@ -131,7 +131,10 @@ jobs:
         env:
           RAILS_ENV: test
         working-directory: redmine
-        run: bundle exec rails test plugins/${{ env.PLUGIN_NAME }}/test/unit
+        run: |
+          bundle exec rails test \
+            plugins/${{ env.PLUGIN_NAME }}/test/unit \
+            plugins/${{ env.PLUGIN_NAME }}/test/functional
 
   # Style/lint gate. Standalone (no Redmine checkout needed): it only inspects
   # this plugin's own Ruby against .rubocop.yml, so it's fast and independent of
