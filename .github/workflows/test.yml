@@ -20,6 +20,9 @@ jobs:
   test:
     name: redmine:${{ matrix.redmine_version }} ruby:${{ matrix.ruby_version }} postgis:${{ matrix.db_version }}
     runs-on: ubuntu-latest
+    # Cap runaway steps (stalled bundle install, asset build, or DB wait) well
+    # under GitHub's 6-hour default so a hang can't hold the concurrency group.
+    timeout-minutes: 30
 
     env:
       # Redmine 7 (Rails 8.1) needs the 8.1 geo gem stack, driven per-row via
@@ -58,6 +61,10 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: gtt-project/redmine_gtt
+          # Intentionally the mutable `next` branch: this plugin tracks
+          # redmine_gtt's bleeding edge (Rails 8.1 / Redmine 7 compat and the
+          # geojson-write fixes live there before any tagged release). Pin to a
+          # tag/SHA once redmine_gtt stabilizes a release line.
           ref: next
           path: redmine/plugins/redmine_gtt
           persist-credentials: false
@@ -125,3 +132,28 @@ jobs:
           RAILS_ENV: test
         working-directory: redmine
         run: bundle exec rails test plugins/${{ env.PLUGIN_NAME }}/test/unit
+
+  # Style/lint gate. Standalone (no Redmine checkout needed): it only inspects
+  # this plugin's own Ruby against .rubocop.yml, so it's fast and independent of
+  # the test matrix. RuboCop is pinned so a release bump can't turn CI red
+  # without a deliberate change here (paired with `NewCops: disable`).
+  rubocop:
+    name: RuboCop
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@9eb537ca036ebaed86729dcb9309076e4c5c3b74 # v1.314.0
+        with:
+          ruby-version: "3.4"
+
+      - name: Install RuboCop
+        run: gem install rubocop -v 1.81.1 --no-document
+
+      - name: Run RuboCop
+        run: rubocop --no-server
