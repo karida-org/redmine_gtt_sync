@@ -10,29 +10,6 @@ class GttSyncController < ApplicationController
   accept_api_auth :capabilities
 
   def capabilities
-    plugin = Redmine::Plugin.find(:redmine_gtt_sync)
-
-    render json: {
-      plugin: plugin.id.to_s,
-      version: plugin.version,
-      requires: {
-        # geometry storage and the base geo API come from redmine_gtt
-        redmine_gtt: Redmine::Plugin.installed?(:redmine_gtt)
-      },
-      capabilities: {
-        # provided today by redmine_gtt
-        geojson_read: true,
-        geojson_write: true,
-        spatial_filter_bbox: true,
-        spatial_filter_distance: true,
-        # provided by this plugin (not yet implemented)
-        bulk_geometry_write: false,
-        geometry_only_patch: false,
-        change_feed: false,
-        schema_introspection: false,
-        ogc_api_features: false,
-        wfs_t: false
-      }
-    }
+    render json: RedmineGttSync::Capabilities.report
   end
 end
