@@ -37,8 +37,19 @@ module RedmineGttSync
         # Report redmine_gtt's version, not just presence: the base geo surface
         # depends on it, so a client may need to know which release is running.
         requires: { redmine_gtt: gtt_present, redmine_gtt_version: gtt&.version&.to_s },
-        capabilities: base_capabilities(gtt_present).merge(contract_capabilities)
+        capabilities: base_capabilities(gtt_present).merge(contract_capabilities),
+        # OAuth2 setup parameters so a client can build its auth config without
+        # the user knowing the scopes/endpoints. Public probe, so no client_id
+        # here (that needs a plugin-selected application; see issue #24 Phase B).
+        oauth: RedmineGttSync::OAuth.advertisement(canonical_base_url)
       }
+    end
+
+    # The instance's canonical origin (Setting, not request host) so advertised
+    # OAuth endpoints are stable regardless of how the probe was reached. Named
+    # to match the controller's canonical_base_url so the concept stays one.
+    def canonical_base_url
+      "#{Setting.protocol}://#{Setting.host_name}"
     end
 
     # Read/geometry-write surface comes from redmine_gtt; true only when present.

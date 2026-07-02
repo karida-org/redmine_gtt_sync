@@ -59,4 +59,25 @@ class RedmineGttSyncCapabilitiesTest < ActiveSupport::TestCase
     # Sanity-check the detection predicate against a route that does exist.
     assert RedmineGttSync::Capabilities.route_defined?(:gtt_sync_capabilities)
   end
+
+  def test_advertises_oauth_scopes_and_endpoints
+    # A client (QTask) reads these off the public probe to build its OAuth2
+    # config without the user knowing the scopes. Endpoints come from Setting.
+    oauth = @report[:oauth]
+    base = "#{Setting.protocol}://#{Setting.host_name}"
+    assert_equal "#{base}/oauth/authorize", oauth[:authorize_url]
+    assert_equal "#{base}/oauth/token", oauth[:token_url]
+    assert_equal RedmineGttSync::OAuth::SCOPES, oauth[:scopes]
+    # The integration gate scope must be advertised, else a scoped token 403s.
+    assert_includes oauth[:scopes], 'use_gtt_sync'
+    assert_includes oauth[:scopes], 'view_issues'
+  end
+
+  def test_oauth_advertisement_omits_client_secret_and_id
+    # Public probe: never leak a client secret, and no client_id until a plugin
+    # setting picks the application (issue #24 Phase B).
+    oauth = @report[:oauth]
+    refute oauth.key?(:client_secret)
+    refute oauth.key?(:client_id)
+  end
 end

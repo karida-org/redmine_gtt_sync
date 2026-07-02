@@ -1,4 +1,5 @@
 require 'redmine'
+require_relative 'lib/redmine_gtt_sync/oauth'
 require_relative 'lib/redmine_gtt_sync/capabilities'
 require_relative 'lib/redmine_gtt_sync/geometry'
 require_relative 'lib/redmine_gtt_sync/issue_document'
