@@ -22,3 +22,10 @@ get 'gtt_sync/projects/:id/bundle',
     to: 'gtt_sync#project_bundle',
     as: 'gtt_sync_project_bundle',
     defaults: { format: 'json' }
+
+# Per-project editing schema: trackers, statuses, custom fields, and the fields
+# the current user may write. Lets a client build a permission-aware form.
+get 'gtt_sync/projects/:id/schema',
+    to: 'gtt_sync#project_schema',
+    as: 'gtt_sync_project_schema',
+    defaults: { format: 'json' }
