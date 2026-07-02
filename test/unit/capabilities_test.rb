@@ -50,6 +50,8 @@ class RedmineGttSyncCapabilitiesTest < ActiveSupport::TestCase
       assert_equal expected, @report[:capabilities][cap]
     end
     refute @report[:capabilities][:bulk_geometry_write]
+    # issue_jsonld's route (gtt_sync_issue) does exist, so it advertises true.
+    assert @report[:capabilities][:issue_jsonld]
   end
 
   def test_capabilities_probe_route_is_detected
