@@ -153,6 +153,9 @@ jobs:
           ruby-version: "3.4"
 
       - name: Install RuboCop
+        # zizmor: ignore[adhoc-packages] RuboCop is a CI-only lint tool pinned
+        # to an exact version; a dedicated Gemfile.lock for a single gem adds no
+        # meaningful supply-chain guarantee over the pin.
         run: gem install rubocop -v 1.81.1 --no-document
 
       - name: Run RuboCop
