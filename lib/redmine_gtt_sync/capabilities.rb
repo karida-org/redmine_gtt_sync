@@ -25,13 +25,16 @@ module RedmineGttSync
 
     def report
       plugin = Redmine::Plugin.find(:redmine_gtt_sync)
-      gtt_present = Redmine::Plugin.installed?(:redmine_gtt)
+      gtt = Redmine::Plugin.installed?(:redmine_gtt) ? Redmine::Plugin.find(:redmine_gtt) : nil
+      gtt_present = !gtt.nil?
 
       {
         plugin: plugin.id.to_s,
         version: plugin.version,
         redmine: { version: Redmine::VERSION.to_s, rails: Rails.version },
-        requires: { redmine_gtt: gtt_present },
+        # Report redmine_gtt's version, not just presence: the base geo surface
+        # depends on it, so a client may need to know which release is running.
+        requires: { redmine_gtt: gtt_present, redmine_gtt_version: gtt&.version&.to_s },
         capabilities: base_capabilities(gtt_present).merge(contract_capabilities)
       }
     end

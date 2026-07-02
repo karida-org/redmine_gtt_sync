@@ -36,6 +36,12 @@ class RedmineGttSyncCapabilitiesTest < ActiveSupport::TestCase
     assert_equal true, @report[:capabilities][:geojson_read]
   end
 
+  def test_reports_the_installed_redmine_gtt_version
+    # Not just presence: clients may need to know which redmine_gtt release runs.
+    assert_equal Redmine::Plugin.find(:redmine_gtt).version.to_s,
+                 @report[:requires][:redmine_gtt_version]
+  end
+
   def test_contract_capabilities_reflect_defined_routes
     # Route-driven, not a hardcoded flag: a contract capability is advertised
     # only when its route exists. None are implemented yet, so all report false.
