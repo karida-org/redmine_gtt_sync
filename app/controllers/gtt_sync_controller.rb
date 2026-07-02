@@ -8,7 +8,7 @@ class GttSyncController < ApplicationController
   # the server offers before it has credentials. The issue document is real
   # data, so it stays behind login + visibility.
   skip_before_action :check_if_login_required, only: [:capabilities]
-  accept_api_auth :capabilities, :issue
+  accept_api_auth :capabilities, :issue, :project_bundle
 
   def capabilities
     render json: RedmineGttSync::Capabilities.report
@@ -24,6 +24,22 @@ class GttSyncController < ApplicationController
            content_type: 'application/ld+json'
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Issue not found' }, status: :not_found
+  end
+
+  # Whole project in one optimized, permission-scoped payload. Project.visible
+  # and Issue.visible enforce the same access control as the rest of Redmine.
+  def project_bundle
+    key = params[:id].to_s
+    project = Project.visible.find_by(identifier: key)
+    project ||= Project.visible.find_by(id: key) if key.match?(/\A\d+\z/)
+    raise ActiveRecord::RecordNotFound unless project
+
+    issues = project.issues.visible.to_a
+    render json: RedmineGttSync::ProjectBundle.build(
+      project, issues, base_url: canonical_base_url
+    )
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Project not found' }, status: :not_found
   end
 
   private
