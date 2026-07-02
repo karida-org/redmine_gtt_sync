@@ -14,3 +14,11 @@ get 'gtt_sync/issues/:id',
     to: 'gtt_sync#issue',
     as: 'gtt_sync_issue',
     defaults: { format: 'json' }
+
+# One optimized, permission-scoped payload for a whole project: issues split by
+# geometry type + unplaced (no geometry) + boundary. :id is a project id or
+# identifier.
+get 'gtt_sync/projects/:id/bundle',
+    to: 'gtt_sync#project_bundle',
+    as: 'gtt_sync_project_bundle',
+    defaults: { format: 'json' }
