@@ -52,7 +52,10 @@ module RedmineGttSync
     end
 
     def route_defined?(route_name)
-      Rails.application.routes.named_routes.key?(route_name)
+      # url_helpers reflects every named route reliably; named_routes.key? does
+      # not pick up plugin routes here (Redmine loads them into a way that
+      # leaves that collection empty for our names).
+      Rails.application.routes.url_helpers.respond_to?(:"#{route_name}_path")
     end
   end
 end
