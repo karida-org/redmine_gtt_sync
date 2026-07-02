@@ -9,9 +9,9 @@ module RedmineGttSync
   # provisioning derive from it and lets clients react when the list grows
   # (e.g. adding :add_issue_notes) without a client release.
   module OAuth
-    # Ordered so the advertised string is stable. Least privilege for the QGIS
-    # sync: list/pick projects, read/create/edit issues, read GTT styling, and
-    # pass the gtt_sync integration gate.
+    # Ordered so the advertised list is stable across requests. Least privilege
+    # for the QGIS sync: list/pick projects, read/create/edit issues, read GTT
+    # styling, and pass the gtt_sync integration gate.
     SCOPES = %w[
       view_project
       search_project

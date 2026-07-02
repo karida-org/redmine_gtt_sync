@@ -41,13 +41,14 @@ module RedmineGttSync
         # OAuth2 setup parameters so a client can build its auth config without
         # the user knowing the scopes/endpoints. Public probe, so no client_id
         # here (that needs a plugin-selected application; see issue #24 Phase B).
-        oauth: RedmineGttSync::OAuth.advertisement(base_url)
+        oauth: RedmineGttSync::OAuth.advertisement(canonical_base_url)
       }
     end
 
     # The instance's canonical origin (Setting, not request host) so advertised
-    # OAuth endpoints are stable regardless of how the probe was reached.
-    def base_url
+    # OAuth endpoints are stable regardless of how the probe was reached. Named
+    # to match the controller's canonical_base_url so the concept stays one.
+    def canonical_base_url
       "#{Setting.protocol}://#{Setting.host_name}"
     end
 
