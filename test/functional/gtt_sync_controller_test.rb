@@ -64,4 +64,12 @@ class GttSyncControllerTest < ActionController::TestCase
     get :project_schema, params: { id: 'no-such-project' }
     assert_response :not_found
   end
+
+  test 'schema hides a project the user cannot see (visibility is enforced)' do
+    Project.find(1).update_column(:is_public, false)
+    with_settings login_required: '0' do
+      get :project_schema, params: { id: 'ecookbook' }
+    end
+    assert_response :not_found
+  end
 end
