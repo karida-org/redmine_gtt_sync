@@ -3,5 +3,7 @@
 
 # Capabilities probe: lets a client feature-detect what this server supports
 # before authenticating or attempting an unsupported operation.
-get 'gtt_sync/capabilities', to: 'gtt_sync#capabilities',
-    as: 'gtt_sync_capabilities', defaults: { format: 'json' }
+get 'gtt_sync/capabilities',
+    to: 'gtt_sync#capabilities',
+    as: 'gtt_sync_capabilities',
+    defaults: { format: 'json' }

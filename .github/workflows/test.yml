@@ -1,0 +1,162 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PLUGIN_NAME: redmine_gtt_sync
+
+jobs:
+  test:
+    name: redmine:${{ matrix.redmine_version }} ruby:${{ matrix.ruby_version }} postgis:${{ matrix.db_version }}
+    runs-on: ubuntu-latest
+    # Cap runaway steps (stalled bundle install, asset build, or DB wait) well
+    # under GitHub's 6-hour default so a hang can't hold the concurrency group.
+    timeout-minutes: 30
+
+    env:
+      # Redmine 7 (Rails 8.1) needs the 8.1 geo gem stack, driven per-row via
+      # redmine_gtt's GEM_* env vars; 6.x stays on the Gemfile defaults.
+      GEM_RGEO_VERSION: ${{ matrix.rgeo || '3.0.1' }}
+      GEM_RGEO_ACTIVERECORD_VERSION: ${{ matrix.rgeo_ar || '8.0.0' }}
+      GEM_ACTIVERECORD_POSTGIS_ADAPTER_VERSION: ${{ matrix.postgis_adapter || '10.0.0' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { redmine_version: 6.1-stable, ruby_version: "3.4", db_version: 18-3.6 }
+          - { redmine_version: 7.0-stable, ruby_version: "4.0", db_version: 18-3.6, rgeo: "3.1.0", rgeo_ar: "8.1.0", postgis_adapter: "11.1.0" }
+
+    services:
+      postgres:
+        image: postgis/postgis:${{ matrix.db_version }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout Redmine
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: redmine/redmine
+          ref: ${{ matrix.redmine_version }}
+          path: redmine
+          persist-credentials: false
+
+      - name: Checkout redmine_gtt (required dependency)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: gtt-project/redmine_gtt
+          # Intentionally the mutable `next` branch: this plugin tracks
+          # redmine_gtt's bleeding edge (Rails 8.1 / Redmine 7 compat and the
+          # geojson-write fixes live there before any tagged release). Pin to a
+          # tag/SHA once redmine_gtt stabilizes a release line.
+          ref: next
+          path: redmine/plugins/redmine_gtt
+          persist-credentials: false
+
+      - name: Checkout plugin
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          path: redmine/plugins/${{ env.PLUGIN_NAME }}
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@9eb537ca036ebaed86729dcb9309076e4c5c3b74 # v1.314.0
+        with:
+          ruby-version: ${{ matrix.ruby_version }}
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+
+      - name: Install native gem system libraries
+        run: |
+          sudo apt-get update --yes --quiet
+          sudo apt-get install --yes --quiet --no-install-recommends libpq-dev libgeos-dev
+
+      - name: Build redmine_gtt assets
+        working-directory: redmine/plugins/redmine_gtt
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        # The dependency's engine expects its built assets to be present at boot.
+        run: |
+          corepack enable pnpm
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Prepare Redmine source
+        working-directory: redmine
+        run: |
+          cat <<EOF > config/database.yml
+            test:
+              adapter: postgis
+              database: redmine
+              host: 127.0.0.1
+              username: postgres
+              password: postgres
+              encoding: utf8
+          EOF
+
+      - name: Install Ruby dependencies
+        working-directory: redmine
+        run: |
+          bundle config set --local without 'development'
+          bundle install --jobs=4 --retry=3
+
+      - name: Run Redmine rake tasks
+        env:
+          RAILS_ENV: test
+        working-directory: redmine
+        run: |
+          bundle exec rake generate_secret_token
+          bundle exec rake db:create db:migrate redmine:plugins:migrate
+
+      - name: Run tests
+        env:
+          RAILS_ENV: test
+        working-directory: redmine
+        run: bundle exec rails test plugins/${{ env.PLUGIN_NAME }}/test/unit
+
+  # Style/lint gate. Standalone (no Redmine checkout needed): it only inspects
+  # this plugin's own Ruby against .rubocop.yml, so it's fast and independent of
+  # the test matrix. RuboCop is pinned so a release bump can't turn CI red
+  # without a deliberate change here (paired with `NewCops: disable`).
+  rubocop:
+    name: RuboCop
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@9eb537ca036ebaed86729dcb9309076e4c5c3b74 # v1.314.0
+        with:
+          ruby-version: "3.4"
+
+      - name: Install RuboCop
+        # zizmor: ignore[adhoc-packages] RuboCop is a CI-only lint tool pinned
+        # to an exact version; a dedicated Gemfile.lock for a single gem adds no
+        # meaningful supply-chain guarantee over the pin.
+        run: gem install rubocop -v 1.81.1 --no-document
+
+      - name: Run RuboCop
+        run: rubocop --no-server

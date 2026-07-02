@@ -1,0 +1,25 @@
+# Minimal RuboCop config for a small Redmine plugin. The plugin loads inside a
+# Redmine checkout, so cops that assume a standalone gem/app are turned off;
+# correctness and layout cops stay on.
+AllCops:
+  TargetRubyVersion: 3.4
+  # Only run cops enabled by default in the pinned RuboCop release, so a version
+  # bump can't silently turn this job red.
+  NewCops: disable
+
+# Redmine plugins don't carry top-level class documentation or per-file
+# frozen-string comments as a convention.
+Style/Documentation:
+  Enabled: false
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+# Plugin test helpers require the host Redmine harness via __FILE__-relative
+# paths; keep that idiom rather than rewriting to __dir__.
+Style/ExpandPathArguments:
+  Enabled: false
+
+# Skeleton endpoints assemble sizable literal hashes; size metrics add noise
+# at this early stage.
+Metrics:
+  Enabled: false
