@@ -2,11 +2,18 @@ require_relative '../test_helper'
 require_relative '../../app/controllers/gtt_sync_controller'
 
 # End-to-end coverage of the controller: id-vs-identifier resolution, the 404
-# path, and (most importantly for a permission-sensitive endpoint) that
-# Project.visible scoping is actually applied.
+# (visibility) path, and the governance gate (gtt_sync module + use_gtt_sync).
 class GttSyncControllerTest < ActionController::TestCase
   fixtures :projects, :users, :email_addresses, :roles, :members, :member_roles,
            :enabled_modules, :trackers, :issue_statuses, :issues
+
+  setup do
+    # Governance opt-in: enable the module on project 1 so access is allowed
+    # for a permitted user (admin holds every permission). Tests that assert the
+    # gate itself override this.
+    project = Project.find(1)
+    project.enabled_module_names = project.enabled_module_names | ['gtt_sync']
+  end
 
   test 'resolves a project by identifier' do
     @request.session[:user_id] = 1
@@ -31,14 +38,30 @@ class GttSyncControllerTest < ActionController::TestCase
   end
 
   test 'project the user cannot see returns 404 (visibility is enforced)' do
-    # Make project 1 private; an anonymous request must not see it. Uses a
-    # non-privileged (anonymous) user with login not required, so the response
-    # is the visibility 404, not a login redirect.
+    # Private project; an anonymous request must not see it (login not required
+    # so it is the visibility 404, not a login redirect).
     Project.find(1).update_column(:is_public, false)
     with_settings login_required: '0' do
       get :project_bundle, params: { id: 'ecookbook' }
     end
     assert_response :not_found
+  end
+
+  test 'forbidden when the gtt_sync module is disabled' do
+    project = Project.find(1)
+    project.enabled_module_names = project.enabled_module_names - ['gtt_sync']
+    @request.session[:user_id] = 1
+    get :project_bundle, params: { id: 'ecookbook' }
+    assert_response :forbidden
+  end
+
+  test 'forbidden when the user role lacks use_gtt_sync' do
+    # jsmith (member of ecookbook) can see the project and its issues, but no
+    # role has the new use_gtt_sync permission, so integration access is denied
+    # even with the module enabled.
+    @request.session[:user_id] = 2
+    get :project_bundle, params: { id: 'ecookbook' }
+    assert_response :forbidden
   end
 
   test 'schema exposes trackers, statuses, custom fields, and writable fields' do
@@ -65,11 +88,11 @@ class GttSyncControllerTest < ActionController::TestCase
     assert_response :not_found
   end
 
-  test 'schema hides a project the user cannot see (visibility is enforced)' do
-    Project.find(1).update_column(:is_public, false)
-    with_settings login_required: '0' do
-      get :project_schema, params: { id: 'ecookbook' }
-    end
-    assert_response :not_found
+  test 'schema is forbidden without integration access' do
+    project = Project.find(1)
+    project.enabled_module_names = project.enabled_module_names - ['gtt_sync']
+    @request.session[:user_id] = 1
+    get :project_schema, params: { id: 'ecookbook' }
+    assert_response :forbidden
   end
 end

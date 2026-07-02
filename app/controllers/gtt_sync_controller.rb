@@ -19,6 +19,8 @@ class GttSyncController < ApplicationController
   # is a 404 either way, so existence is not leaked.
   def issue
     issue = Issue.visible.find(params[:id])
+    return unless integration_allowed?(issue.project)
+
     # Serve as JSON-LD so clients/intermediaries interpret the @context/@id.
     render json: RedmineGttSync::IssueDocument.build(issue, base_url: canonical_base_url),
            content_type: 'application/ld+json'
@@ -30,6 +32,8 @@ class GttSyncController < ApplicationController
   # and Issue.visible enforce the same access control as the rest of Redmine.
   def project_bundle
     project = find_visible_project(params[:id])
+    return unless integration_allowed?(project)
+
     issues = project.issues.visible.to_a
     render json: RedmineGttSync::ProjectBundle.build(
       project, issues, base_url: canonical_base_url
@@ -42,12 +46,29 @@ class GttSyncController < ApplicationController
   # for the current user.
   def project_schema
     project = find_visible_project(params[:id])
+    return unless integration_allowed?(project)
+
     render json: RedmineGttSync::ProjectSchema.build(project, User.current)
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Project not found' }, status: :not_found
   end
 
   private
+
+  # Governance gate. `allowed_to?(:use_gtt_sync, project)` already encompasses
+  # both the gtt_sync module being enabled on the project (Redmine gates
+  # module-scoped permissions, and even admins don't bypass a disabled module)
+  # and the user's role holding the permission. The project is visible either
+  # way, so this is a 403 (not 404): the client can tell "no integration access"
+  # from "no such project". Composes on top of each action's visibility checks.
+  def integration_allowed?(project)
+    return true if User.current.allowed_to?(:use_gtt_sync, project)
+
+    render json: {
+      error: 'GTT integration is not enabled for this project or your role.'
+    }, status: :forbidden
+    false
+  end
 
   # Resolve a project by id or identifier within the user's visibility, or raise
   # RecordNotFound (a hidden project is indistinguishable from a missing one).

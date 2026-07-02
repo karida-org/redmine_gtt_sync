@@ -18,4 +18,15 @@ Redmine::Plugin.register :redmine_gtt_sync do
 
   requires_redmine version_or_higher: '6.1.0'
   requires_redmine_plugin :redmine_gtt, version_or_higher: '0.0.1'
+
+  # Governance: integration access is a per-project module + a per-role
+  # permission. A project must enable the `gtt_sync` module AND the user's role
+  # must have `use_gtt_sync` to reach the contract endpoints. Composes with
+  # Redmine's own view/edit_issues (reading/writing still need those); it never
+  # widens access. No `require:` so an admin may grant it to any role (including
+  # Non member / Anonymous) for public integration if desired.
+  project_module :gtt_sync do
+    permission :use_gtt_sync,
+               { gtt_sync: %i[project_bundle project_schema issue] }
+  end
 end
