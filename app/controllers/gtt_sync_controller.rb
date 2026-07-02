@@ -19,7 +19,9 @@ class GttSyncController < ApplicationController
   # is a 404 either way, so existence is not leaked.
   def issue
     issue = Issue.visible.find(params[:id])
-    render json: RedmineGttSync::IssueDocument.build(issue, base_url: canonical_base_url)
+    # Serve as JSON-LD so clients/intermediaries interpret the @context/@id.
+    render json: RedmineGttSync::IssueDocument.build(issue, base_url: canonical_base_url),
+           content_type: 'application/ld+json'
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Issue not found' }, status: :not_found
   end

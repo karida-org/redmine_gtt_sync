@@ -32,6 +32,8 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     assert_equal 'Broken sign', doc['subject']
     assert_equal 'https://example.com/issue_statuses/1', doc['status']['@id']
     assert_equal 'New', doc['status']['name']
+    assert_equal 'https://example.com/trackers/2', doc['tracker']['@id']
+    assert_equal 'Task', doc['tracker']['name']
     assert_equal 'https://example.com/projects/field-survey', doc['project']['@id']
     assert_equal 'Point', doc['geometry']['type']
     assert doc['asWKT'].start_with?('SRID=4326;'), doc['asWKT']

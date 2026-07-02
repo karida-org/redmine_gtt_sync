@@ -33,7 +33,7 @@ module RedmineGttSync
         'subject' => issue.subject,
         'description' => issue.description.presence,
         'status' => reference(base, 'issue_statuses', issue.status),
-        'tracker' => named(issue.tracker),
+        'tracker' => reference(base, 'trackers', issue.tracker),
         'project' => project_reference(base, issue.project),
         'geometry' => Geometry.to_geojson(geom),
         'asWKT' => Geometry.to_ewkt(geom),
@@ -46,12 +46,6 @@ module RedmineGttSync
       return nil if record.nil?
 
       { '@id' => "#{base}/#{path}/#{record.id}", 'id' => record.id, 'name' => record.name }
-    end
-
-    def named(record)
-      return nil if record.nil?
-
-      { 'id' => record.id, 'name' => record.name }
     end
 
     def project_reference(base, project)
