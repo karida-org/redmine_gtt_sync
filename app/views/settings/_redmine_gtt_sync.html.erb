@@ -4,7 +4,9 @@
   public_apps = Doorkeeper::Application.where(confidential: false).order(:name)
   selected = @settings['oauth_application_uid']
 %>
-<div class="box tabular settings">
+<%# No `box` wrapper: Redmine already renders the settings container, so an
+    inner box draws a second border. `tabular` keeps the label/field alignment. %>
+<div class="tabular">
   <p>
     <label for="settings_oauth_application_uid"><%= l(:label_gtt_sync_oauth_application) %></label>
     <%= select_tag 'settings[oauth_application_uid]',
