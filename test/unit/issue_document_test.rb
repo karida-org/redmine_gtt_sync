@@ -26,6 +26,19 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
       geom: geom,
       lock_version: 4,
       updated_on: Time.utc(2026, 7, 2, 10, 0, 0),
+      priority: OpenStruct.new(id: 2, name: 'Normal'),
+      author: OpenStruct.new(id: 7, name: 'Dev'),
+      assigned_to: OpenStruct.new(id: 8, name: 'Field Worker'),
+      category: nil,
+      fixed_version: nil,
+      parent_id: nil,
+      start_date: Date.new(2026, 7, 1),
+      due_date: nil,
+      done_ratio: 30,
+      estimated_hours: nil,
+      is_private: false,
+      created_on: Time.utc(2026, 6, 1, 9, 0, 0),
+      closed_on: nil,
       journals: [],
       relations: [],
       changesets: [],
@@ -51,6 +64,16 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     assert doc['asWKT'].start_with?('SRID=4326;'), doc['asWKT']
     assert_equal 4, doc['lock_version']
     assert doc['@context'].key?('geo'), 'context declares the GeoSPARQL prefix'
+    # Core fields (reflection-confirmed) are carried.
+    assert_equal 'Normal', doc['priority']['name']
+    assert_equal 'https://example.com/users/7', doc['author']['@id']
+    assert_equal 'Field Worker', doc['assigned_to']['name']
+    assert_equal 30, doc['done_ratio']
+    assert_equal false, doc['is_private']
+    assert_equal '2026-07-01', doc['start_date']
+    # Unset references compact out.
+    refute doc.key?('category')
+    refute doc.key?('fixed_version')
   end
 
   def test_issue_without_geometry_omits_geometry_keys

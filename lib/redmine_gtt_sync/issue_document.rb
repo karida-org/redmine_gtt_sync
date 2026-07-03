@@ -50,10 +50,26 @@ module RedmineGttSync
         'status' => reference(base, 'issue_statuses', issue.status),
         'tracker' => reference(base, 'trackers', issue.tracker),
         'project' => project_reference(base, issue.project),
+        # Core fields, taken from Issue's real columns/associations (confirmed by
+        # ActiveRecord reflection, not guessed from REST): references compact out
+        # when unset; is_private/done_ratio stay (false/0 are meaningful).
+        'priority' => reference(base, 'enumerations', issue.priority),
+        'author' => reference(base, 'users', issue.author),
+        'assigned_to' => reference(base, 'users', issue.assigned_to),
+        'category' => reference(base, 'issue_categories', issue.category),
+        'fixed_version' => reference(base, 'versions', issue.fixed_version),
+        'parent' => parent_reference(base, issue),
+        'start_date' => issue.start_date&.iso8601,
+        'due_date' => issue.due_date&.iso8601,
+        'done_ratio' => issue.done_ratio,
+        'estimated_hours' => issue.estimated_hours,
+        'is_private' => issue.is_private,
         'geometry' => Geometry.to_geojson(geom),
         'asWKT' => Geometry.to_ewkt(geom),
         'lock_version' => issue.lock_version,
+        'created_on' => issue.created_on&.iso8601,
         'updated_on' => issue.updated_on&.iso8601,
+        'closed_on' => issue.closed_on&.iso8601,
         # Rich sections (always present, possibly empty) - the data model both the
         # online detail panel and offline packaging consume.
         'journals' => journals(base, issue, user),
@@ -88,6 +104,12 @@ module RedmineGttSync
       return nil if record.nil?
 
       { '@id' => "#{base}/#{path}/#{record.id}", 'id' => record.id, 'name' => record.name }
+    end
+
+    def parent_reference(base, issue)
+      return nil unless issue.parent_id
+
+      { '@id' => "#{base}/issues/#{issue.parent_id}", 'id' => issue.parent_id }
     end
 
     def project_reference(base, project)
