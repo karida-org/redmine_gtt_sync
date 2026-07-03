@@ -39,8 +39,9 @@ module RedmineGttSync
         requires: { redmine_gtt: gtt_present, redmine_gtt_version: gtt&.version&.to_s },
         capabilities: base_capabilities(gtt_present).merge(contract_capabilities),
         # OAuth2 setup parameters so a client can build its auth config without
-        # the user knowing the scopes/endpoints. Public probe, so no client_id
-        # here (that needs a plugin-selected application; see issue #24 Phase B).
+        # the user knowing the scopes/endpoints. Public probe: scopes/endpoints
+        # always, plus the client_id only when an admin selected a public app to
+        # advertise (see advertised_oauth_client_id); never a client secret.
         oauth: RedmineGttSync::OAuth.advertisement(
           canonical_base_url, client_id: advertised_oauth_client_id
         )
