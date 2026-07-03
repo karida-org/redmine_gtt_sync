@@ -28,8 +28,8 @@ class GttSyncSettingsControllerTest < ActionController::TestCase
 
     assert_redirected_to plugin_settings_path(id: 'redmine_gtt_sync')
     assert flash[:notice].present?
-    app = Doorkeeper::Application.where(confidential: false)
-                                .find_by(name: RedmineGttSync::OAuth::QTASK_APP_NAME)
+    public_apps = Doorkeeper::Application.where(confidential: false)
+    app = public_apps.find_by(name: RedmineGttSync::OAuth::QTASK_APP_NAME)
     assert app, 'expected a public QTask application to exist'
     assert_equal app.uid, Setting.plugin_redmine_gtt_sync['oauth_application_uid']
   end
