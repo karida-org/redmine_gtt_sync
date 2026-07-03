@@ -23,8 +23,9 @@ module RedmineGttSync
     # - role + tracker + workflow). Lets a client build a permission-aware edit
     # form and never offer an edit Redmine would silently drop.
     def detailed_values(issue, user)
-      editable_ids = issue.editable_custom_field_values(user)
-                          .map(&:custom_field_id).to_set
+      # A plain array (not a Set) so we don't depend on `set` being required;
+      # the editable-field list per issue is small, so include? is fine.
+      editable_ids = issue.editable_custom_field_values(user).map(&:custom_field_id)
       issue.visible_custom_field_values.map do |value|
         field = value.custom_field
         base(value).merge(
