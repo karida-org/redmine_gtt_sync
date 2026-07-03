@@ -46,4 +46,16 @@ class GttSyncConnectControllerTest < ActionController::TestCase
     get :qgis_config
     assert_response :not_found
   end
+
+  test 'qgis_config requires login' do
+    # Guard the download endpoint too: it must never be publicly accessible.
+    get :qgis_config
+    assert_response :redirect
+  end
+
+  test 'qgis_config forbids a logged-in user without gtt_sync access' do
+    @request.session[:user_id] = 2 # jsmith holds no use_gtt_sync permission
+    get :qgis_config
+    assert_response :forbidden
+  end
 end
