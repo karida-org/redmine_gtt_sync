@@ -6,11 +6,19 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
     @factory ||= RGeo::Cartesian.preferred_factory(srid: 4326)
   end
 
-  def issue(id, geom:, status_id: 1, tracker_id: 2)
+  def issue(id, geom:, status_id: 1, tracker_id: 2, custom_field_values: [])
     OpenStruct.new(
       id: id, subject: "Issue #{id}", status_id: status_id,
-      tracker_id: tracker_id, lock_version: 0, geom: geom
+      tracker_id: tracker_id, lock_version: 0, geom: geom,
+      visible_custom_field_values: custom_field_values
     )
+  end
+
+  def custom_value(id:, name:, value:, field_format: 'string', multiple: false)
+    field = OpenStruct.new(
+      id: id, name: name, field_format: field_format, multiple: multiple
+    )
+    OpenStruct.new(custom_field: field, value: value)
   end
 
   def ring
@@ -54,6 +62,29 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
     assert_equal 'Point', feature['geometry']['type']
     assert_equal 1, feature['properties']['status_id']
     assert_equal 2, feature['properties']['tracker_id']
+    assert_equal [], feature['properties']['custom_fields']
+  end
+
+  def test_summary_carries_visible_custom_field_values
+    values = [
+      custom_value(id: 5, name: 'Severity', value: 'High', field_format: 'list'),
+      custom_value(id: 6, name: 'Tags', value: %w[a b], multiple: true)
+    ]
+    feature = build([issue(1, geom: factory.point(1.0, 2.0),
+                           custom_field_values: values)])['issues']['point']['features'][0]
+    cfs = feature['properties']['custom_fields']
+    assert_equal 2, cfs.size
+    assert_equal({ 'id' => 5, 'name' => 'Severity', 'field_format' => 'list',
+                   'multiple' => false, 'value' => 'High' }, cfs[0])
+    assert_equal %w[a b], cfs[1]['value']
+    assert_equal true, cfs[1]['multiple']
+  end
+
+  def test_unplaced_summary_also_carries_custom_fields
+    values = [custom_value(id: 5, name: 'Severity', value: 'Low')]
+    unplaced = build([issue(9, geom: nil,
+                            custom_field_values: values)])['issues']['unplaced'][0]
+    assert_equal 'Severity', unplaced['custom_fields'][0]['name']
   end
 
   def test_unplaced_summary_has_no_geometry
