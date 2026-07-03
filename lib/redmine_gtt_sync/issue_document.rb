@@ -75,7 +75,7 @@ module RedmineGttSync
         'journals' => journals(base, issue, user),
         'relations' => relations(base, issue, user),
         'changesets' => changesets(issue, user),
-        'attachments' => attachments(base, issue),
+        'attachments' => attachments(base, issue, user),
         'custom_fields' => custom_fields(issue)
       }.compact
     end
@@ -179,9 +179,12 @@ module RedmineGttSync
     end
 
     # Attachments, split image vs other so a client can render photos with
-    # thumbnails and list other files as links.
-    def attachments(base, issue)
-      issue.attachments.map do |attachment|
+    # thumbnails and list other files as links. Filtered through Redmine's own
+    # Attachment#visible? so we never expose files the user may not see (delegate
+    # the rule to Redmine rather than reimplement it).
+    def attachments(base, issue, user)
+      visible = issue.attachments.select { |attachment| attachment.visible?(user) }
+      visible.map do |attachment|
         image = attachment.image?
         name = ERB::Util.url_encode(attachment.filename)
         {
