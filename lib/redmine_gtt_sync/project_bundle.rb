@@ -56,6 +56,12 @@ module RedmineGttSync
     # ID-based properties, matching the shape GTT's issues.geojson emits.
     # `project_id` lets a cross-project (query) result render and route writes to
     # the right project; it is harmless in the single-project bundle too.
+    #
+    # `custom_fields` carries the issue's visible custom-field values (same shape
+    # as the single issue document) so the whole loaded set - and an offline
+    # package built from it - has them without an N+1 per-issue fetch. The client
+    # writes them to a related table, not flat columns (applicability and
+    # multi-value don't fit a uniform schema).
     def summary(issue)
       {
         'id' => issue.id,
@@ -63,7 +69,8 @@ module RedmineGttSync
         'subject' => issue.subject,
         'status_id' => issue.status_id,
         'tracker_id' => issue.tracker_id,
-        'lock_version' => issue.lock_version
+        'lock_version' => issue.lock_version,
+        'custom_fields' => CustomFields.values(issue)
       }
     end
 
