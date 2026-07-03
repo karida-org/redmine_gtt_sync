@@ -16,7 +16,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   # A lightweight stand-in for an Issue: the builder only reads attributes and
   # associations, so this avoids DB fixtures and keeps the test a pure unit.
   def fake_issue(geom: nil)
-    OpenStruct.new(
+    issue = OpenStruct.new(
       id: 12,
       subject: 'Broken sign',
       description: 'A description',
@@ -45,6 +45,13 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
       attachments: [],
       visible_custom_field_values: []
     )
+    # These take a user arg, so they can't be plain OpenStruct readers; stub the
+    # RBAC editing contract (safe_attribute_names + new_statuses_allowed_to).
+    issue.stubs(:safe_attribute_names).returns(%w[subject description status_id geojson])
+    issue.stubs(:new_statuses_allowed_to).returns(
+      [OpenStruct.new(id: 1, name: 'New'), OpenStruct.new(id: 2, name: 'In Progress')]
+    )
+    issue
   end
 
   def test_builds_identity_references_and_geometry
@@ -94,6 +101,15 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     assert_equal [], doc['attachments']
     assert_equal [], doc['custom_fields']
     assert doc['@context'].key?('journals'), 'context declares the new terms'
+  end
+
+  def test_editable_contract_carries_writable_fields_and_status_transitions
+    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://x')
+    assert_equal %w[subject description status_id geojson], doc['editable']['fields']
+    assert_equal(
+      ['New', 'In Progress'],
+      doc['editable']['status_transitions'].map { |s| s['name'] }
+    )
   end
 
   def test_custom_field_values_carry_format_and_multiple

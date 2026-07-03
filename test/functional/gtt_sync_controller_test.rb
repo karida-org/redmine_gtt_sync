@@ -108,6 +108,10 @@ class GttSyncControllerTest < ActionController::TestCase
     assert doc.key?('changesets')
     assert doc.key?('attachments')
     assert doc.key?('custom_fields')
+    # RBAC editing contract: writable fields + valid status transitions.
+    assert_includes doc['editable']['fields'], 'subject'
+    assert_includes doc['editable']['fields'], 'status_id'
+    assert doc['editable']['status_transitions'].any?
     # Issue 1 has journals in the fixtures, with change details.
     assert doc['journals'].any?, 'expected journals from fixtures'
     assert(doc['journals'].any? { |j| j['details'].any? })

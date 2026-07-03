@@ -28,7 +28,8 @@ module RedmineGttSync
       'relations' => 'gtt:relations',
       'changesets' => 'gtt:changesets',
       'attachments' => 'gtt:attachments',
-      'custom_fields' => 'gtt:customFields'
+      'custom_fields' => 'gtt:customFields',
+      'editable' => 'gtt:editable'
     }.freeze
 
     module_function
@@ -76,8 +77,24 @@ module RedmineGttSync
         'relations' => relations(base, issue, user),
         'changesets' => changesets(issue, user),
         'attachments' => attachments(base, issue, user),
-        'custom_fields' => custom_fields(issue)
+        'custom_fields' => custom_fields(issue),
+        'editable' => editable(issue, user)
       }.compact
+    end
+
+    # The RBAC editing contract for THIS issue + user: exactly what Redmine will
+    # accept, so a client never loses edits to a silent safe_attributes drop and
+    # only offers valid status transitions. We delegate the rules to Redmine
+    # (safe_attribute_names encodes role + per-tracker workflow + per-status
+    # field permissions; new_statuses_allowed_to encodes the workflow), rather
+    # than reimplementing the permission model.
+    def editable(issue, user)
+      {
+        'fields' => issue.safe_attribute_names(user),
+        'status_transitions' => issue.new_statuses_allowed_to(user).map do |status|
+          { 'id' => status.id, 'name' => status.name }
+        end
+      }
     end
 
     # Custom field VALUES for this issue, aligned with Redmine's REST
