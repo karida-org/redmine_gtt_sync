@@ -44,6 +44,30 @@ module RedmineGttSync
       app
     end
 
+    # The QGIS OAuth2 config for this instance, keyed exactly as QGIS's auth
+    # import/export uses it. Served as a downloadable file from the Connect QGIS
+    # page so a user can import it instead of hand-filling QGIS's OAuth2 editor.
+    # Mirrors what QTask generates programmatically (public PKCE client, Bearer,
+    # loopback redirect, no secret). grantFlow 3 = Authorization Code + PKCE;
+    # accessMethod 0 = Bearer header.
+    def qgis_oauth2_config(base_url, client_id)
+      {
+        version: 1,
+        configType: 1,
+        grantFlow: 3,
+        accessMethod: 0,
+        requestUrl: authorize_url(base_url),
+        tokenUrl: token_url(base_url),
+        redirectHost: '127.0.0.1',
+        redirectPort: 7070,
+        clientId: client_id,
+        clientSecret: nil,
+        scope: SCOPES.join(' '),
+        persistToken: false,
+        requestTimeout: 30
+      }
+    end
+
     def authorize_url(base_url)
       "#{base_url.chomp('/')}/oauth/authorize"
     end

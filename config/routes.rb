@@ -1,6 +1,15 @@
 # Plugin routes are evaluated inside Redmine's routing context, so route
 # declarations are written directly (not wrapped in a draw block).
 
+# User-facing "Connect QGIS" page (any logged-in user): shows the instance URL,
+# advertised client_id, and scopes, and serves a downloadable QGIS OAuth2 config.
+get 'gtt_sync/connect',
+    to: 'gtt_sync_connect#show',
+    as: 'gtt_sync_connect'
+get 'gtt_sync/connect/qgis_config',
+    to: 'gtt_sync_connect#qgis_config',
+    as: 'gtt_sync_connect_qgis_config'
+
 # One-click provisioning of the public QTask OAuth application from the plugin
 # settings screen (admin only). POST so it is CSRF-protected.
 post 'gtt_sync/oauth_application',
