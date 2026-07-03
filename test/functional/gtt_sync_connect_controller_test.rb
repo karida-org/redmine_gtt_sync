@@ -16,8 +16,14 @@ class GttSyncConnectControllerTest < ActionController::TestCase
     assert_response :redirect
   end
 
-  test 'shows connection details to a logged-in non-admin' do
-    @request.session[:user_id] = 2 # jsmith
+  test 'forbids a logged-in user without gtt_sync access' do
+    @request.session[:user_id] = 2 # jsmith holds no use_gtt_sync permission
+    get :show
+    assert_response :forbidden
+  end
+
+  test 'shows connection details to a user with gtt_sync access' do
+    @request.session[:user_id] = 1 # admin passes the permission gate
     get :show
     assert_response :success
     assert_select 'h2', 'Connect QGIS'
@@ -26,7 +32,7 @@ class GttSyncConnectControllerTest < ActionController::TestCase
   test 'qgis_config downloads the config when a client_id is advertised' do
     app = RedmineGttSync::OAuth.ensure_qtask_application
     Setting.plugin_redmine_gtt_sync = { 'oauth_application_uid' => app.uid }
-    @request.session[:user_id] = 2
+    @request.session[:user_id] = 1
     get :qgis_config
     assert_response :success
     assert_equal 'application/json', @response.media_type
@@ -36,7 +42,7 @@ class GttSyncConnectControllerTest < ActionController::TestCase
   end
 
   test 'qgis_config 404s when no client_id is advertised' do
-    @request.session[:user_id] = 2
+    @request.session[:user_id] = 1
     get :qgis_config
     assert_response :not_found
   end

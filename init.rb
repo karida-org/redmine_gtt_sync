@@ -37,9 +37,11 @@ Redmine::Plugin.register :redmine_gtt_sync do
   settings default: { 'oauth_application_uid' => '' },
            partial: 'settings/redmine_gtt_sync'
 
-  # Discoverable, self-serve "Connect QGIS" page for any logged-in user (#27).
+  # Discoverable, self-serve "Connect QGIS" page (#27). Shown only to users who
+  # can actually use the integration (use_gtt_sync in any project; admins pass),
+  # matching the controller gate, so it isn't a misleading entry for everyone.
   menu :top_menu, :gtt_sync_connect,
        { controller: 'gtt_sync_connect', action: 'show' },
        caption: :label_gtt_sync_connect,
-       if: proc { User.current.logged? }
+       if: proc { User.current.allowed_to?(:use_gtt_sync, nil, global: true) }
 end
