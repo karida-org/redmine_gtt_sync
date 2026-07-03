@@ -5,7 +5,8 @@ require_relative '../../app/controllers/gtt_sync_controller'
 # (visibility) path, and the governance gate (gtt_sync module + use_gtt_sync).
 class GttSyncControllerTest < ActionController::TestCase
   fixtures :projects, :users, :email_addresses, :roles, :members, :member_roles,
-           :enabled_modules, :trackers, :issue_statuses, :issues
+           :enabled_modules, :trackers, :issue_statuses, :issues,
+           :journals, :journal_details
 
   setup do
     # Governance opt-in: enable the module on project 1 so access is allowed
@@ -94,6 +95,26 @@ class GttSyncControllerTest < ActionController::TestCase
     @request.session[:user_id] = 1
     get :project_schema, params: { id: 'ecookbook' }
     assert_response :forbidden
+  end
+
+  test 'issue document carries the rich sections' do
+    @request.session[:user_id] = 1
+    get :issue, params: { id: 1 }
+    assert_response :success
+    doc = JSON.parse(response.body)
+    # The canonical data model always exposes these sections (possibly empty).
+    assert doc.key?('journals')
+    assert doc.key?('relations')
+    assert doc.key?('changesets')
+    assert doc.key?('attachments')
+    assert doc.key?('custom_fields')
+    # RBAC editing contract: writable fields + valid status transitions.
+    assert_includes doc['editable']['fields'], 'subject'
+    assert_includes doc['editable']['fields'], 'status_id'
+    assert doc['editable']['status_transitions'].any?
+    # Issue 1 has journals in the fixtures, with change details.
+    assert doc['journals'].any?, 'expected journals from fixtures'
+    assert(doc['journals'].any? { |j| j['details'].any? })
   end
 
   test 'issue is forbidden without integration access' do
