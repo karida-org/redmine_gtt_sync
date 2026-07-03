@@ -105,18 +105,16 @@ module RedmineGttSync
     # safe_attribute_names), and the option sets are delegated to Redmine so
     # project scoping and visibility stay correct.
     def reference_options(issue, writable)
-      options = {}
-      if writable.include?('assigned_to_id')
-        options['assigned_to_id'] = named(issue.assignable_users)
+      # Lazy sources so a non-writable field's options are never queried.
+      sources = {
+        'assigned_to_id' => -> { issue.assignable_users },
+        'priority_id' => -> { IssuePriority.active },
+        'category_id' => -> { issue.project.issue_categories },
+        'fixed_version_id' => -> { issue.assignable_versions }
+      }
+      sources.each_with_object({}) do |(field, source), options|
+        options[field] = named(source.call) if writable.include?(field)
       end
-      options['priority_id'] = named(IssuePriority.active) if writable.include?('priority_id')
-      if writable.include?('category_id')
-        options['category_id'] = named(issue.project.issue_categories)
-      end
-      if writable.include?('fixed_version_id')
-        options['fixed_version_id'] = named(issue.assignable_versions)
-      end
-      options
     end
 
     def named(records)
