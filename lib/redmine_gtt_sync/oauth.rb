@@ -33,13 +33,18 @@ module RedmineGttSync
     end
 
     # The OAuth block for the capabilities payload. Doorkeeper is bundled in
-    # RedMica/Redmine core, so these endpoints always exist.
-    def advertisement(base_url)
-      {
+    # RedMica/Redmine core, so these endpoints always exist. ``client_id`` is
+    # included only when an admin has selected a public app to advertise (a
+    # public PKCE client_id is not a secret); omitted otherwise so a client
+    # falls back to asking the user for it.
+    def advertisement(base_url, client_id: nil)
+      ad = {
         authorize_url: authorize_url(base_url),
         token_url: token_url(base_url),
         scopes: SCOPES
       }
+      ad[:client_id] = client_id if client_id.present?
+      ad
     end
   end
 end

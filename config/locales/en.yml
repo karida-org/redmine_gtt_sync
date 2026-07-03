@@ -1,0 +1,5 @@
+en:
+  label_gtt_sync_oauth_application: "QTask OAuth application"
+  label_gtt_sync_oauth_application_none: "(advertise scopes only, no client ID)"
+  text_gtt_sync_oauth_application_hint: "Public (PKCE) OAuth application whose client ID is advertised to QGIS/QTask clients on the capabilities probe, so users don't have to look it up. Only non-confidential applications are listed; a client secret is never advertised."
+  text_gtt_sync_oauth_no_public_apps: "No public OAuth applications found. Register a non-confidential OAuth application (Authorization Code + PKCE, no client secret) under Administration to advertise it here."

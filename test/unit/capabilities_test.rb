@@ -73,11 +73,53 @@ class RedmineGttSyncCapabilitiesTest < ActiveSupport::TestCase
     assert_includes oauth[:scopes], 'view_issues'
   end
 
-  def test_oauth_advertisement_omits_client_secret_and_id
-    # Public probe: never leak a client secret, and no client_id until a plugin
-    # setting picks the application (issue #24 Phase B).
+  def test_oauth_advertisement_omits_client_secret_and_id_by_default
+    # Public probe: never leak a client secret, and no client_id until an admin
+    # selects an application to advertise (default is unset).
     oauth = @report[:oauth]
     refute oauth.key?(:client_secret)
     refute oauth.key?(:client_id)
+  end
+
+  def test_advertises_selected_public_apps_client_id
+    app = Doorkeeper::Application.create!(
+      name: 'QTaskTest', redirect_uri: 'http://127.0.0.1:7070/',
+      scopes: RedmineGttSync::OAuth::SCOPES.join(' '), confidential: false
+    )
+    with_gtt_sync_oauth_app(app.uid) do
+      assert_equal app.uid, RedmineGttSync::Capabilities.report[:oauth][:client_id]
+    end
+  ensure
+    app&.destroy
+  end
+
+  def test_never_advertises_a_confidential_apps_client_id
+    # A confidential client_id must never be published, even if selected.
+    app = Doorkeeper::Application.create!(
+      name: 'QTaskConfidential', redirect_uri: 'http://127.0.0.1:7070/',
+      scopes: RedmineGttSync::OAuth::SCOPES.join(' '), confidential: true
+    )
+    with_gtt_sync_oauth_app(app.uid) do
+      refute RedmineGttSync::Capabilities.report[:oauth].key?(:client_id)
+    end
+  ensure
+    app&.destroy
+  end
+
+  def test_stale_selected_uid_advertises_nothing
+    # A selected uid that no longer resolves to a public app leaks nothing.
+    with_gtt_sync_oauth_app('does-not-exist') do
+      refute RedmineGttSync::Capabilities.report[:oauth].key?(:client_id)
+    end
+  end
+
+  private
+
+  def with_gtt_sync_oauth_app(uid)
+    previous = Setting.plugin_redmine_gtt_sync
+    Setting.plugin_redmine_gtt_sync = previous.merge('oauth_application_uid' => uid)
+    yield
+  ensure
+    Setting.plugin_redmine_gtt_sync = previous
   end
 end

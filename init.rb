@@ -30,4 +30,10 @@ Redmine::Plugin.register :redmine_gtt_sync do
     permission :use_gtt_sync,
                { gtt_sync: %i[project_bundle project_schema issue] }
   end
+
+  # Which public OAuth application QTask advertises (its client_id) on the
+  # capabilities probe, so users don't have to look it up on the admin-only
+  # applications page. Empty = advertise scopes/endpoints only. See #26.
+  settings default: { 'oauth_application_uid' => '' },
+           partial: 'settings/redmine_gtt_sync'
 end
