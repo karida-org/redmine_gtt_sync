@@ -1,0 +1,22 @@
+<%
+  # Only public (non-confidential) apps are eligible: a public PKCE client_id is
+  # not a secret and is safe to advertise; a confidential client's must not be.
+  public_apps = Doorkeeper::Application.where(confidential: false).order(:name)
+  selected = @settings['oauth_application_uid']
+%>
+<div class="box tabular settings">
+  <p>
+    <label for="settings_oauth_application_uid"><%= l(:label_gtt_sync_oauth_application) %></label>
+    <%= select_tag 'settings[oauth_application_uid]',
+          options_for_select(
+            [[l(:label_gtt_sync_oauth_application_none), '']] +
+              public_apps.map { |app| [app.name, app.uid] },
+            selected
+          ),
+          id: 'settings_oauth_application_uid' %>
+    <em class="info"><%= l(:text_gtt_sync_oauth_application_hint) %></em>
+  </p>
+  <% if public_apps.empty? %>
+    <p><em class="info"><%= l(:text_gtt_sync_oauth_no_public_apps) %></em></p>
+  <% end %>
+</div>

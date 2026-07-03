@@ -41,7 +41,9 @@ module RedmineGttSync
         # OAuth2 setup parameters so a client can build its auth config without
         # the user knowing the scopes/endpoints. Public probe, so no client_id
         # here (that needs a plugin-selected application; see issue #24 Phase B).
-        oauth: RedmineGttSync::OAuth.advertisement(canonical_base_url)
+        oauth: RedmineGttSync::OAuth.advertisement(
+          canonical_base_url, client_id: advertised_oauth_client_id
+        )
       }
     end
 
@@ -50,6 +52,18 @@ module RedmineGttSync
     # to match the controller's canonical_base_url so the concept stays one.
     def canonical_base_url
       "#{Setting.protocol}://#{Setting.host_name}"
+    end
+
+    # client_id of the admin-selected OAuth application, or nil. Only public
+    # (non-confidential) apps are eligible: a public PKCE client_id is not a
+    # secret, but a confidential one must never be advertised. A stored uid that
+    # no longer resolves to a public app (deleted, or flipped to confidential)
+    # advertises nothing rather than leaking.
+    def advertised_oauth_client_id
+      uid = Setting.plugin_redmine_gtt_sync['oauth_application_uid'].presence
+      return nil unless uid
+
+      Doorkeeper::Application.where(confidential: false).find_by(uid: uid)&.uid
     end
 
     # Read/geometry-write surface comes from redmine_gtt; true only when present.
