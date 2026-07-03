@@ -59,7 +59,8 @@ class GttSyncController < ApplicationController
   # and may be cross-project or global, so there is no single project to gate on.
   def query_bundle
     if params[:query_id].blank?
-      return render json: { error: 'query_id is required' }, status: :bad_request
+      render json: { error: 'query_id is required' }, status: :bad_request
+      return
     end
 
     query = IssueQuery.visible.find(params[:query_id])
