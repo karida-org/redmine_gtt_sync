@@ -89,12 +89,38 @@ module RedmineGttSync
     # field permissions; new_statuses_allowed_to encodes the workflow), rather
     # than reimplementing the permission model.
     def editable(issue, user)
+      writable = issue.safe_attribute_names(user)
       {
-        'fields' => issue.safe_attribute_names(user),
+        'fields' => writable,
         'status_transitions' => issue.new_statuses_allowed_to(user).map do |status|
           { 'id' => status.id, 'name' => status.name }
-        end
+        end,
+        'references' => reference_options(issue, writable)
       }
+    end
+
+    # Allowed {id, name} options for the writable reference fields, so a client
+    # can offer real dropdowns for assignee / priority / category / version
+    # instead of a raw id. Only fields the user may write are included (gated by
+    # safe_attribute_names), and the option sets are delegated to Redmine so
+    # project scoping and visibility stay correct.
+    def reference_options(issue, writable)
+      options = {}
+      if writable.include?('assigned_to_id')
+        options['assigned_to_id'] = named(issue.assignable_users)
+      end
+      options['priority_id'] = named(IssuePriority.active) if writable.include?('priority_id')
+      if writable.include?('category_id')
+        options['category_id'] = named(issue.project.issue_categories)
+      end
+      if writable.include?('fixed_version_id')
+        options['fixed_version_id'] = named(issue.assignable_versions)
+      end
+      options
+    end
+
+    def named(records)
+      records.map { |record| { 'id' => record.id, 'name' => record.name } }
     end
 
     # Custom field values for this issue, with editing metadata (possible_values

@@ -137,6 +137,22 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     assert_equal true, cf[0]['writable']
   end
 
+  def test_editable_references_offer_options_for_writable_reference_fields
+    issue = fake_issue
+    issue.stubs(:safe_attribute_names).returns(%w[subject assigned_to_id priority_id])
+    issue.stubs(:assignable_users).returns([OpenStruct.new(id: 8, name: 'Field Worker')])
+    IssuePriority.stubs(:active).returns([OpenStruct.new(id: 2, name: 'Normal')])
+
+    refs = RedmineGttSync::IssueDocument.build(
+      issue, base_url: 'https://x'
+    )['editable']['references']
+    assert_equal [{ 'id' => 8, 'name' => 'Field Worker' }], refs['assigned_to_id']
+    assert_equal [{ 'id' => 2, 'name' => 'Normal' }], refs['priority_id']
+    # Reference fields the user can't write get no option list (and aren't queried).
+    refute refs.key?('category_id')
+    refute refs.key?('fixed_version_id')
+  end
+
   def test_custom_field_not_editable_is_marked_read_only
     field = OpenStruct.new(id: 5, name: 'Severity', field_format: 'list',
                            multiple: false, possible_values: [])
