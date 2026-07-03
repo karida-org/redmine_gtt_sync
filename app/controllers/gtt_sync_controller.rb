@@ -8,7 +8,7 @@ class GttSyncController < ApplicationController
   # the server offers before it has credentials. The issue document is real
   # data, so it stays behind login + visibility.
   skip_before_action :check_if_login_required, only: [:capabilities]
-  accept_api_auth :capabilities, :issue, :project_bundle, :project_schema
+  accept_api_auth :capabilities, :issue, :project_bundle, :project_schema, :query_bundle
 
   def capabilities
     render json: RedmineGttSync::Capabilities.report
@@ -51,6 +51,30 @@ class GttSyncController < ApplicationController
     render json: RedmineGttSync::ProjectSchema.build(project, User.current)
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Project not found' }, status: :not_found
+  end
+
+  # Any saved query as one bundle: issues split by geometry + unplaced, the
+  # boundaries of every project represented, and a project directory. The query
+  # generalizes the project bundle (project load == query with a project filter)
+  # and may be cross-project or global, so there is no single project to gate on.
+  def query_bundle
+    if params[:query_id].blank?
+      return render json: { error: 'query_id is required' }, status: :bad_request
+    end
+
+    query = IssueQuery.visible.find(params[:query_id])
+    # query.issues is already view_issues-scoped; layer use_gtt_sync per project
+    # (project-scoped permission) so a cross-project query only yields issues
+    # from projects the user may integrate with. Check each distinct project once.
+    all_issues = query.issues
+    projects = all_issues.map(&:project).uniq
+    allowed = projects.select { |project| User.current.allowed_to?(:use_gtt_sync, project) }
+    allowed_ids = allowed.map(&:id).to_set
+    issues = all_issues.select { |issue| allowed_ids.include?(issue.project_id) }
+
+    render json: RedmineGttSync::QueryBundle.build(issues, base_url: canonical_base_url)
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Query not found' }, status: :not_found
   end
 
   private
