@@ -1,6 +1,12 @@
 # Plugin routes are evaluated inside Redmine's routing context, so route
 # declarations are written directly (not wrapped in a draw block).
 
+# One-click provisioning of the public QTask OAuth application from the plugin
+# settings screen (admin only). POST so it is CSRF-protected.
+post 'gtt_sync/oauth_application',
+     to: 'gtt_sync_settings#create_oauth_application',
+     as: 'gtt_sync_create_oauth_application'
+
 # Capabilities probe: lets a client feature-detect what this server supports
 # before authenticating or attempting an unsupported operation.
 get 'gtt_sync/capabilities',
