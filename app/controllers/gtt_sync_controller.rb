@@ -34,7 +34,10 @@ class GttSyncController < ApplicationController
     project = find_visible_project(params[:id])
     return unless integration_allowed?(project)
 
-    issues = project.issues.visible.to_a
+    # Eager-load the custom-value associations the bundle serializes
+    # (visible_custom_field_values per issue), so a large project doesn't fan
+    # out into an N+1 of per-issue custom-value/custom-field queries.
+    issues = project.issues.visible.preload(custom_values: :custom_field).to_a
     render json: RedmineGttSync::ProjectBundle.build(
       project, issues, base_url: canonical_base_url
     )
@@ -72,6 +75,12 @@ class GttSyncController < ApplicationController
     allowed = projects.select { |project| User.current.allowed_to?(:use_gtt_sync, project) }
     allowed_ids = allowed.map(&:id).to_set
     issues = all_issues.select { |issue| allowed_ids.include?(issue.project_id) }
+    # query.issues is an array, so preload the custom-value associations the
+    # bundle serializes on the final set (not the discarded cross-project ones)
+    # to avoid an N+1 of per-issue custom-value/custom-field queries.
+    ActiveRecord::Associations::Preloader.new(
+      records: issues, associations: { custom_values: :custom_field }
+    ).call
 
     render json: RedmineGttSync::QueryBundle.build(issues, base_url: canonical_base_url)
   rescue ActiveRecord::RecordNotFound
