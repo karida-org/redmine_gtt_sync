@@ -19,4 +19,12 @@
   <% if public_apps.empty? %>
     <p><em class="info"><%= l(:text_gtt_sync_oauth_no_public_apps) %></em></p>
   <% end %>
+  <p>
+    <%# An <a> (not a nested form) so it is valid inside the settings form; UJS
+        turns method: :post into a CSRF-protected POST. %>
+    <%= link_to l(:button_gtt_sync_create_oauth_application),
+                gtt_sync_create_oauth_application_path,
+                method: :post, class: 'icon icon-add' %>
+    <em class="info"><%= l(:text_gtt_sync_create_oauth_application_hint) %></em>
+  </p>
 </div>

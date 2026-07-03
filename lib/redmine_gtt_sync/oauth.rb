@@ -22,7 +22,27 @@ module RedmineGttSync
       use_gtt_sync
     ].freeze
 
+    # The managed public client QTask uses: Authorization Code + PKCE, loopback
+    # redirect on QGIS's default OAuth port, no client secret.
+    QTASK_APP_NAME = 'QTask'.freeze
+    QTASK_REDIRECT_URI = 'http://127.0.0.1:7070/'.freeze
+
     module_function
+
+    # Create or reconcile the public QTask OAuth application and return it, so an
+    # admin can provision a correctly-configured client in one click instead of
+    # hand-registering one. Idempotent: an existing public "QTask" app has its
+    # redirect + scopes brought back in line (this is also how the scope list
+    # stays current as it grows); never touches a confidential app of that name.
+    def ensure_qtask_application
+      app = Doorkeeper::Application.where(confidential: false)
+                                   .find_or_initialize_by(name: QTASK_APP_NAME)
+      app.redirect_uri = QTASK_REDIRECT_URI
+      app.scopes = SCOPES.join(' ')
+      app.confidential = false
+      app.save!
+      app
+    end
 
     def authorize_url(base_url)
       "#{base_url.chomp('/')}/oauth/authorize"
