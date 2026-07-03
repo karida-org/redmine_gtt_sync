@@ -54,9 +54,12 @@ module RedmineGttSync
     end
 
     # ID-based properties, matching the shape GTT's issues.geojson emits.
+    # `project_id` lets a cross-project (query) result render and route writes to
+    # the right project; it is harmless in the single-project bundle too.
     def summary(issue)
       {
         'id' => issue.id,
+        'project_id' => issue.project_id,
         'subject' => issue.subject,
         'status_id' => issue.status_id,
         'tracker_id' => issue.tracker_id,

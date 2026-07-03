@@ -15,6 +15,7 @@ module RedmineGttSync
     CONTRACT_ROUTES = {
       issue_jsonld: :gtt_sync_issue,
       project_bundle: :gtt_sync_project_bundle,
+      query_bundle: :gtt_sync_query_bundle,
       bulk_geometry_write: :gtt_sync_bulk_geometry,
       geometry_only_patch: :gtt_sync_geometry,
       change_feed: :gtt_sync_changes,

@@ -30,6 +30,13 @@ get 'gtt_sync/issues/:id',
     as: 'gtt_sync_issue',
     defaults: { format: 'json' }
 
+# Query-driven bundle: any saved query (project-scoped, cross-project, or
+# global) as one payload. Generalizes the project bundle. Requires ?query_id=N.
+get 'gtt_sync/bundle',
+    to: 'gtt_sync#query_bundle',
+    as: 'gtt_sync_query_bundle',
+    defaults: { format: 'json' }
+
 # One optimized, permission-scoped payload for a whole project: issues split by
 # geometry type + unplaced (no geometry) + boundary. :id is a project id or
 # identifier.

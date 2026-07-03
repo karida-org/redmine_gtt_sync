@@ -50,9 +50,10 @@ class RedmineGttSyncCapabilitiesTest < ActiveSupport::TestCase
       assert_equal expected, @report[:capabilities][cap]
     end
     refute @report[:capabilities][:bulk_geometry_write]
-    # issue_jsonld and project_bundle have routes, so they advertise true.
+    # issue_jsonld, project_bundle, and query_bundle have routes -> advertise true.
     assert @report[:capabilities][:issue_jsonld]
     assert @report[:capabilities][:project_bundle]
+    assert @report[:capabilities][:query_bundle]
   end
 
   def test_capabilities_probe_route_is_detected
