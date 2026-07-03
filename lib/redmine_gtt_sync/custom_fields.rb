@@ -12,17 +12,37 @@ module RedmineGttSync
   module CustomFields
     module_function
 
+    # Lean shape for the bundle (whole loaded set): identity + type + value.
     def values(issue)
+      issue.visible_custom_field_values.map { |value| base(value) }
+    end
+
+    # Editing shape for the single issue document: adds the field's
+    # `possible_values` (for list-type widgets) and `writable` (whether THIS user
+    # may edit THIS field on THIS issue, per Redmine's editable_custom_field_values
+    # - role + tracker + workflow). Lets a client build a permission-aware edit
+    # form and never offer an edit Redmine would silently drop.
+    def detailed_values(issue, user)
+      editable_ids = issue.editable_custom_field_values(user)
+                          .map(&:custom_field_id).to_set
       issue.visible_custom_field_values.map do |value|
         field = value.custom_field
-        {
-          'id' => field.id,
-          'name' => field.name,
-          'field_format' => field.field_format,
-          'multiple' => field.multiple,
-          'value' => value.value
-        }
+        base(value).merge(
+          'possible_values' => field.possible_values || [],
+          'writable' => editable_ids.include?(field.id)
+        )
       end
+    end
+
+    def base(value)
+      field = value.custom_field
+      {
+        'id' => field.id,
+        'name' => field.name,
+        'field_format' => field.field_format,
+        'multiple' => field.multiple,
+        'value' => value.value
+      }
     end
   end
 end

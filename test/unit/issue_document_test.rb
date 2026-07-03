@@ -51,6 +51,9 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     issue.stubs(:new_statuses_allowed_to).returns(
       [OpenStruct.new(id: 1, name: 'New'), OpenStruct.new(id: 2, name: 'In Progress')]
     )
+    # editable_custom_field_values(user) drives the per-field `writable` flag;
+    # default to none editable (tests that check it override this).
+    issue.stubs(:editable_custom_field_values).returns([])
     issue
   end
 
@@ -112,11 +115,16 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     )
   end
 
-  def test_custom_field_values_carry_format_and_multiple
-    field = OpenStruct.new(id: 5, name: 'Severity', field_format: 'list', multiple: false)
-    value = OpenStruct.new(custom_field: field, value: 'High')
+  def test_custom_field_values_carry_format_multiple_and_edit_metadata
+    field = OpenStruct.new(
+      id: 5, name: 'Severity', field_format: 'list', multiple: false,
+      possible_values: %w[Low Medium High]
+    )
+    value = OpenStruct.new(custom_field: field, custom_field_id: 5, value: 'High')
     issue = fake_issue
     issue.visible_custom_field_values = [value]
+    # This user may edit field 5, so it comes back writable with its options.
+    issue.stubs(:editable_custom_field_values).returns([value])
 
     cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields']
     assert_equal 1, cf.size
@@ -125,5 +133,18 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     assert_equal 'list', cf[0]['field_format']
     assert_equal false, cf[0]['multiple']
     assert_equal 'High', cf[0]['value']
+    assert_equal %w[Low Medium High], cf[0]['possible_values']
+    assert_equal true, cf[0]['writable']
+  end
+
+  def test_custom_field_not_editable_is_marked_read_only
+    field = OpenStruct.new(id: 5, name: 'Severity', field_format: 'list',
+                           multiple: false, possible_values: [])
+    value = OpenStruct.new(custom_field: field, custom_field_id: 5, value: 'High')
+    issue = fake_issue
+    issue.visible_custom_field_values = [value]
+    # editable_custom_field_values is empty (the fake default), so not writable.
+    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields']
+    assert_equal false, cf[0]['writable']
   end
 end

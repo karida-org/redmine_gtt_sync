@@ -77,7 +77,7 @@ module RedmineGttSync
         'relations' => relations(base, issue, user),
         'changesets' => changesets(issue, user),
         'attachments' => attachments(base, issue, user),
-        'custom_fields' => custom_fields(issue),
+        'custom_fields' => custom_fields(issue, user),
         'editable' => editable(issue, user)
       }.compact
     end
@@ -97,10 +97,11 @@ module RedmineGttSync
       }
     end
 
-    # Custom field VALUES for this issue. Shared with the bundle so the detail
-    # panel and the whole loaded set carry the same shape (see CustomFields).
-    def custom_fields(issue)
-      CustomFields.values(issue)
+    # Custom field values for this issue, with editing metadata (possible_values
+    # + writable) so the detail panel can build a permission-aware edit form. The
+    # bundle uses the lean CustomFields.values instead (see CustomFields).
+    def custom_fields(issue, user)
+      CustomFields.detailed_values(issue, user)
     end
 
     def reference(base, path, record)
