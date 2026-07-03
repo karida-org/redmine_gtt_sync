@@ -27,7 +27,8 @@ module RedmineGttSync
       'journals' => 'gtt:journals',
       'relations' => 'gtt:relations',
       'changesets' => 'gtt:changesets',
-      'attachments' => 'gtt:attachments'
+      'attachments' => 'gtt:attachments',
+      'custom_fields' => 'gtt:customFields'
     }.freeze
 
     module_function
@@ -58,8 +59,29 @@ module RedmineGttSync
         'journals' => journals(base, issue, user),
         'relations' => relations(base, issue, user),
         'changesets' => changesets(issue, user),
-        'attachments' => attachments(base, issue)
+        'attachments' => attachments(base, issue),
+        'custom_fields' => custom_fields(issue)
       }.compact
+    end
+
+    # Custom field VALUES for this issue, aligned with Redmine's REST
+    # `custom_fields: [{id, name, value}]` but enriched with field_format +
+    # multiple so a client can render/edit without cross-referencing
+    # /custom_fields.json. Only the fields applicable to this issue's
+    # project/tracker and visible to the user are returned (visible_custom_field_values).
+    # `value` is Redmine's stored value: a string, or an array for multi-value
+    # fields, or null when unset.
+    def custom_fields(issue)
+      issue.visible_custom_field_values.map do |value|
+        field = value.custom_field
+        {
+          'id' => field.id,
+          'name' => field.name,
+          'field_format' => field.field_format,
+          'multiple' => field.multiple,
+          'value' => value.value
+        }
+      end
     end
 
     def reference(base, path, record)

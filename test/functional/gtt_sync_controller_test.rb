@@ -107,6 +107,7 @@ class GttSyncControllerTest < ActionController::TestCase
     assert doc.key?('relations')
     assert doc.key?('changesets')
     assert doc.key?('attachments')
+    assert doc.key?('custom_fields')
     # Issue 1 has journals in the fixtures, with change details.
     assert doc['journals'].any?, 'expected journals from fixtures'
     assert(doc['journals'].any? { |j| j['details'].any? })

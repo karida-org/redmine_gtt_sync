@@ -29,7 +29,8 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
       journals: [],
       relations: [],
       changesets: [],
-      attachments: []
+      attachments: [],
+      visible_custom_field_values: []
     )
   end
 
@@ -68,6 +69,22 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     assert_equal [], doc['relations']
     assert_equal [], doc['changesets']
     assert_equal [], doc['attachments']
+    assert_equal [], doc['custom_fields']
     assert doc['@context'].key?('journals'), 'context declares the new terms'
+  end
+
+  def test_custom_field_values_carry_format_and_multiple
+    field = OpenStruct.new(id: 5, name: 'Severity', field_format: 'list', multiple: false)
+    value = OpenStruct.new(custom_field: field, value: 'High')
+    issue = fake_issue
+    issue.visible_custom_field_values = [value]
+
+    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields']
+    assert_equal 1, cf.size
+    assert_equal 5, cf[0]['id']
+    assert_equal 'Severity', cf[0]['name']
+    assert_equal 'list', cf[0]['field_format']
+    assert_equal false, cf[0]['multiple']
+    assert_equal 'High', cf[0]['value']
   end
 end
