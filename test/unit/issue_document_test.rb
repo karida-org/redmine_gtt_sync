@@ -137,6 +137,43 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     assert_equal true, cf[0]['writable']
   end
 
+  def test_editable_references_offer_options_only_for_writable_fields
+    issue = fake_issue
+    issue.stubs(:safe_attribute_names).returns(%w[subject assigned_to_id priority_id])
+    issue.stubs(:assignable_users).returns([OpenStruct.new(id: 8, name: 'Field Worker')])
+    IssuePriority.stubs(:active).returns([OpenStruct.new(id: 2, name: 'Normal')])
+    # The non-writable reference fields must not be queried at all.
+    issue.expects(:assignable_versions).never
+    issue.project.expects(:issue_categories).never
+
+    refs = RedmineGttSync::IssueDocument.build(
+      issue, base_url: 'https://x'
+    )['editable']['references']
+    assert_equal [{ 'id' => 8, 'name' => 'Field Worker' }], refs['assigned_to_id']
+    assert_equal [{ 'id' => 2, 'name' => 'Normal' }], refs['priority_id']
+    refute refs.key?('category_id')
+    refute refs.key?('fixed_version_id')
+  end
+
+  def test_editable_references_cover_all_four_reference_fields
+    issue = fake_issue
+    issue.stubs(:safe_attribute_names).returns(
+      %w[assigned_to_id priority_id category_id fixed_version_id]
+    )
+    issue.stubs(:assignable_users).returns([OpenStruct.new(id: 8, name: 'Worker')])
+    issue.stubs(:assignable_versions).returns([OpenStruct.new(id: 4, name: 'v1')])
+    issue.project.stubs(:issue_categories).returns([OpenStruct.new(id: 3, name: 'Signs')])
+    IssuePriority.stubs(:active).returns([OpenStruct.new(id: 2, name: 'Normal')])
+
+    refs = RedmineGttSync::IssueDocument.build(
+      issue, base_url: 'https://x'
+    )['editable']['references']
+    assert_equal %w[assigned_to_id priority_id category_id fixed_version_id].sort,
+                 refs.keys.sort
+    assert_equal [{ 'id' => 3, 'name' => 'Signs' }], refs['category_id']
+    assert_equal [{ 'id' => 4, 'name' => 'v1' }], refs['fixed_version_id']
+  end
+
   def test_custom_field_not_editable_is_marked_read_only
     field = OpenStruct.new(id: 5, name: 'Severity', field_format: 'list',
                            multiple: false, possible_values: [])
