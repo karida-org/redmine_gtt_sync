@@ -36,4 +36,10 @@ Redmine::Plugin.register :redmine_gtt_sync do
   # applications page. Empty = advertise scopes/endpoints only. See #26.
   settings default: { 'oauth_application_uid' => '' },
            partial: 'settings/redmine_gtt_sync'
+
+  # Discoverable, self-serve "Connect QGIS" page for any logged-in user (#27).
+  menu :top_menu, :gtt_sync_connect,
+       { controller: 'gtt_sync_connect', action: 'show' },
+       caption: :label_gtt_sync_connect,
+       if: proc { User.current.logged? }
 end

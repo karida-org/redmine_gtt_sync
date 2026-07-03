@@ -1,0 +1,36 @@
+<% html_title l(:label_gtt_sync_connect) %>
+
+<h2><%= l(:label_gtt_sync_connect) %></h2>
+
+<p><%= l(:text_gtt_sync_connect_intro) %></p>
+
+<table class="list">
+  <tbody>
+    <tr>
+      <th><%= l(:label_gtt_sync_connect_url) %></th>
+      <td><code><%= @base_url %></code></td>
+    </tr>
+    <% if @client_id.present? %>
+      <tr>
+        <th><%= l(:label_gtt_sync_connect_client_id) %></th>
+        <td><code><%= @client_id %></code></td>
+      </tr>
+    <% end %>
+    <tr>
+      <th><%= l(:label_gtt_sync_connect_scopes) %></th>
+      <td><code><%= @scopes.join(' ') %></code></td>
+    </tr>
+  </tbody>
+</table>
+
+<% if @client_id.present? %>
+  <p>
+    <%= link_to l(:button_gtt_sync_download_qgis_config),
+                gtt_sync_connect_qgis_config_path,
+                class: 'icon icon-download' %>
+  </p>
+<% else %>
+  <p class="warning"><%= l(:text_gtt_sync_connect_no_client_id) %></p>
+<% end %>
+
+<p class="info"><%= l(:text_gtt_sync_connect_instructions) %></p>
