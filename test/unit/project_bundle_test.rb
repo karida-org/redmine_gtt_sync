@@ -70,8 +70,8 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
       custom_value(id: 5, name: 'Severity', value: 'High', field_format: 'list'),
       custom_value(id: 6, name: 'Tags', value: %w[a b], multiple: true)
     ]
-    feature = build([issue(1, geom: factory.point(1.0, 2.0),
-                           custom_field_values: values)])['issues']['point']['features'][0]
+    issues = [issue(1, geom: factory.point(1.0, 2.0), custom_field_values: values)]
+    feature = build(issues)['issues']['point']['features'][0]
     cfs = feature['properties']['custom_fields']
     assert_equal 2, cfs.size
     assert_equal({ 'id' => 5, 'name' => 'Severity', 'field_format' => 'list',
@@ -82,8 +82,8 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
 
   def test_unplaced_summary_also_carries_custom_fields
     values = [custom_value(id: 5, name: 'Severity', value: 'Low')]
-    unplaced = build([issue(9, geom: nil,
-                            custom_field_values: values)])['issues']['unplaced'][0]
+    issues = [issue(9, geom: nil, custom_field_values: values)]
+    unplaced = build(issues)['issues']['unplaced'][0]
     assert_equal 'Severity', unplaced['custom_fields'][0]['name']
   end
 
