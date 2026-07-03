@@ -2,6 +2,13 @@ require File.expand_path('../../test_helper', __FILE__)
 require 'ostruct'
 
 class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
+  setup do
+    # build() reads User.current for the changeset permission gate; with empty
+    # associations below the rich sections just come back empty. (Populated
+    # sections are covered against real records in the controller test.)
+    User.stubs(:current).returns(stub(allowed_to?: false))
+  end
+
   def factory
     RGeo::Cartesian.preferred_factory(srid: 4326, has_z_coordinate: true)
   end
@@ -18,7 +25,11 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
       project: OpenStruct.new(id: 3, identifier: 'field-survey', name: 'Field Survey'),
       geom: geom,
       lock_version: 4,
-      updated_on: Time.utc(2026, 7, 2, 10, 0, 0)
+      updated_on: Time.utc(2026, 7, 2, 10, 0, 0),
+      journals: [],
+      relations: [],
+      changesets: [],
+      attachments: []
     )
   end
 
@@ -48,5 +59,15 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     refute doc.key?('geometry')
     refute doc.key?('asWKT')
     assert_equal 'https://example.com/issues/12', doc['@id']
+  end
+
+  def test_rich_sections_present_and_empty_without_data
+    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://example.com')
+    # The sections are always present (stable shape) even with no data.
+    assert_equal [], doc['journals']
+    assert_equal [], doc['relations']
+    assert_equal [], doc['changesets']
+    assert_equal [], doc['attachments']
+    assert doc['@context'].key?('journals'), 'context declares the new terms'
   end
 end
