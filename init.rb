@@ -57,6 +57,7 @@ end
 # (e.g. a Docker volume mount).
 begin
   require 'fileutils'
+  require 'securerandom'
   # Source is derived from this file's own location, so a differently named
   # plugin directory (packaged, vendored, checked out elsewhere) still resolves.
   # The destination uses the plugin id, which is what
@@ -71,7 +72,9 @@ begin
   # the volume) do not clobber each other's in-progress staging. Best-effort: a
   # lost swap race self-heals on the next boot.
   copy_assets = lambda do
-    staged = "#{public_assets_dir}.staged.#{Process.pid}"
+    # A random token (not just the pid, which can collide across replicas
+    # sharing the volume) keeps concurrent boots on distinct staging dirs.
+    staged = "#{public_assets_dir}.staged.#{SecureRandom.hex(8)}"
     FileUtils.rm_rf(staged)
     begin
       FileUtils.cp_r(plugin_assets_dir, staged)

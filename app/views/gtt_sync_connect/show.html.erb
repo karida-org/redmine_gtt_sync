@@ -7,13 +7,17 @@
 <%
   # A value cell with an inline "Copy" button. The button copies the sibling
   # `.gtt-copy-value` text (single source of truth; see gtt_sync_connect.js).
-  copy_cell = lambda do |value|
+  # `field` names the value for assistive tech (each button gets a distinct
+  # aria-label), and aria-live announces the "Copied" state change.
+  copy_cell = lambda do |value, field|
     content_tag(:td) do
       concat content_tag(:code, value, class: 'gtt-copy-value')
       concat ' '.html_safe
       concat content_tag(:button, l(:button_gtt_sync_copy),
                           type: 'button',
                           class: 'gtt-copy',
+                          'aria-label' => "#{l(:button_gtt_sync_copy)} #{field}",
+                          'aria-live' => 'polite',
                           'data-label-copy' => l(:button_gtt_sync_copy),
                           'data-label-copied' => l(:label_gtt_sync_copied))
     end
@@ -28,17 +32,17 @@
   <tbody>
     <tr>
       <th><%= l(:label_gtt_sync_connect_url) %></th>
-      <%= copy_cell.call(@base_url) %>
+      <%= copy_cell.call(@base_url, l(:label_gtt_sync_connect_url)) %>
     </tr>
     <% if @client_id.present? %>
       <tr>
         <th><%= l(:label_gtt_sync_connect_client_id) %></th>
-        <%= copy_cell.call(@client_id) %>
+        <%= copy_cell.call(@client_id, l(:label_gtt_sync_connect_client_id)) %>
       </tr>
     <% end %>
     <tr>
       <th><%= l(:label_gtt_sync_connect_scopes) %></th>
-      <%= copy_cell.call(@scopes.join(' ')) %>
+      <%= copy_cell.call(@scopes.join(' '), l(:label_gtt_sync_connect_scopes)) %>
     </tr>
   </tbody>
 </table>
