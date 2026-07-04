@@ -65,14 +65,21 @@ begin
   plugin_assets_dir = File.join(__dir__, 'assets')
   public_assets_dir = Rails.root.join('public', 'plugin_assets', 'redmine_gtt_sync')
 
-  # Copy assets into place atomically: populate a temp dir, then swap it in, so a
-  # failed or partial copy never leaves a half-populated (JS-404ing) directory.
+  # Copy assets into place: stage a full copy in a per-process directory, then
+  # swap it in, so a failed or partial copy never leaves a half-populated
+  # (JS-404ing) destination, and concurrent boots (a clustered deploy sharing
+  # the volume) do not clobber each other's in-progress staging. Best-effort: a
+  # lost swap race self-heals on the next boot.
   copy_assets = lambda do
-    tmp_dir = "#{public_assets_dir}.tmp"
-    FileUtils.rm_rf(tmp_dir)
-    FileUtils.cp_r(plugin_assets_dir, tmp_dir)
-    FileUtils.rm_rf(public_assets_dir)
-    FileUtils.mv(tmp_dir, public_assets_dir)
+    staged = "#{public_assets_dir}.staged.#{Process.pid}"
+    FileUtils.rm_rf(staged)
+    begin
+      FileUtils.cp_r(plugin_assets_dir, staged)
+      FileUtils.rm_rf(public_assets_dir)
+      FileUtils.mv(staged, public_assets_dir)
+    ensure
+      FileUtils.rm_rf(staged)
+    end
   end
 
   if File.directory?(plugin_assets_dir)

@@ -27,6 +27,24 @@ class GttSyncConnectControllerTest < ActionController::TestCase
     get :show
     assert_response :success
     assert_select 'h2', 'Connect QGIS'
+    # The click-to-copy wiring must render: the page script plus a Copy button
+    # per value. With no client_id advertised the client-id row is omitted, so
+    # only URL + Scopes carry a button.
+    assert_select 'script[src*=?]', 'gtt_sync_connect'
+    assert_select 'button.gtt-copy', 2
+    assert_select 'th', text: 'OAuth Client ID', count: 0
+  end
+
+  test 'shows a copy button for the client id when one is advertised' do
+    app = RedmineGttSync::OAuth.ensure_qtask_application
+    Setting.plugin_redmine_gtt_sync = { 'oauth_application_uid' => app.uid }
+    @request.session[:user_id] = 1
+    get :show
+    assert_response :success
+    # Client-id row now present: URL + Client ID + Scopes = three Copy buttons.
+    assert_select 'th', text: 'OAuth Client ID'
+    assert_select 'button.gtt-copy', 3
+    assert_select 'code.gtt-copy-value', text: app.uid
   end
 
   test 'qgis_config downloads the config when a client_id is advertised' do
