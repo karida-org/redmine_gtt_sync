@@ -13,6 +13,8 @@ en:
   label_gtt_sync_connect_url: "Instance URL"
   label_gtt_sync_connect_client_id: "OAuth Client ID"
   label_gtt_sync_connect_scopes: "Scopes"
+  button_gtt_sync_copy: "Copy"
+  label_gtt_sync_copied: "Copied"
   button_gtt_sync_download_qgis_config: "Download QGIS OAuth2 config"
   text_gtt_sync_connect_no_client_id: "This instance hasn't published an OAuth Client ID yet. Ask an administrator to select or create the QTask OAuth application in the plugin settings."
   text_gtt_sync_connect_instructions: "In QGIS: install QTask, add a connection with this Instance URL and OAuth2 authentication, then click Create OAuth2 config (the Client ID and scopes are filled in automatically). Authorize the connection in your browser on first use."
