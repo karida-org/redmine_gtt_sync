@@ -49,3 +49,43 @@ Redmine::Plugin.register :redmine_gtt_sync do
        caption: :label_gtt_sync_connect_menu,
        if: proc { User.current.allowed_to?(:use_gtt_sync, nil, global: true) }
 end
+
+# Serve this plugin's assets/ under public/plugin_assets/. This stack does not
+# auto-mirror plugin assets (no boot-time mirror, and assets:precompile skips
+# plugin_assets), so each plugin links its own - mirroring redmine_canvas_gantt.
+# Symlink when possible; fall back to copying where symlinks are unavailable
+# (e.g. a Docker volume mount).
+begin
+  require 'fileutils'
+  plugin_assets_dir = Rails.root.join('plugins', 'redmine_gtt_sync', 'assets')
+  public_assets_dir = Rails.root.join('public', 'plugin_assets', 'redmine_gtt_sync')
+
+  if File.directory?(plugin_assets_dir)
+    FileUtils.mkdir_p(public_assets_dir.parent)
+
+    if File.symlink?(public_assets_dir)
+      # Refresh an outdated symlink target.
+      link_target = begin
+        File.realpath(public_assets_dir)
+      rescue StandardError
+        nil
+      end
+      unless link_target == plugin_assets_dir.to_s
+        FileUtils.rm_f(public_assets_dir)
+        FileUtils.ln_s(plugin_assets_dir, public_assets_dir)
+      end
+    elsif File.exist?(public_assets_dir)
+      # Keep copied assets in sync when a symlink is unavailable.
+      FileUtils.rm_rf(public_assets_dir)
+      FileUtils.cp_r(plugin_assets_dir, public_assets_dir)
+    else
+      begin
+        FileUtils.ln_s(plugin_assets_dir, public_assets_dir)
+      rescue Errno::EPERM, Errno::EACCES
+        FileUtils.cp_r(plugin_assets_dir, public_assets_dir)
+      end
+    end
+  end
+rescue StandardError => e
+  Rails.logger.warn("redmine_gtt_sync: failed to link plugin assets: #{e.message}") if defined?(Rails)
+end

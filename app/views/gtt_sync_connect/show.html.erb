@@ -1,5 +1,25 @@
 <% html_title l(:label_gtt_sync_connect) %>
 
+<% content_for :header_tags do %>
+  <%= javascript_include_tag 'gtt_sync_connect', plugin: 'redmine_gtt_sync' %>
+<% end %>
+
+<%
+  # A value cell with an inline "Copy" button. The button copies the sibling
+  # `.gtt-copy-value` text (single source of truth; see gtt_sync_connect.js).
+  copy_cell = lambda do |value|
+    content_tag(:td) do
+      concat content_tag(:code, value, class: 'gtt-copy-value')
+      concat ' '.html_safe
+      concat content_tag(:button, l(:button_gtt_sync_copy),
+                          type: 'button',
+                          class: 'gtt-copy',
+                          'data-label-copy' => l(:button_gtt_sync_copy),
+                          'data-label-copied' => l(:label_gtt_sync_copied))
+    end
+  end
+%>
+
 <h2><%= l(:label_gtt_sync_connect) %></h2>
 
 <p><%= l(:text_gtt_sync_connect_intro) %></p>
@@ -8,17 +28,17 @@
   <tbody>
     <tr>
       <th><%= l(:label_gtt_sync_connect_url) %></th>
-      <td><code><%= @base_url %></code></td>
+      <%= copy_cell.call(@base_url) %>
     </tr>
     <% if @client_id.present? %>
       <tr>
         <th><%= l(:label_gtt_sync_connect_client_id) %></th>
-        <td><code><%= @client_id %></code></td>
+        <%= copy_cell.call(@client_id) %>
       </tr>
     <% end %>
     <tr>
       <th><%= l(:label_gtt_sync_connect_scopes) %></th>
-      <td><code><%= @scopes.join(' ') %></code></td>
+      <%= copy_cell.call(@scopes.join(' ')) %>
     </tr>
   </tbody>
 </table>
