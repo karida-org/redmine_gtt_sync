@@ -63,7 +63,10 @@ module RedmineGttSync
         clientId: client_id,
         clientSecret: nil,
         scope: SCOPES.join(' '),
-        persistToken: false,
+        # Persist the token in QGIS's auth database so an imported connection
+        # stays signed in across restarts (matches QTask's built-in default);
+        # otherwise the token is session-only and re-authorizes every launch.
+        persistToken: true,
         requestTimeout: 30
       }
     end

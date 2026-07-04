@@ -11,6 +11,19 @@ class RedmineGttSyncOAuthTest < ActiveSupport::TestCase
     assert_not RedmineGttSync::OAuth.advertisement(base, client_id: '').key?(:client_id)
   end
 
+  def test_qgis_oauth2_config_persists_token_and_uses_pkce
+    cfg = RedmineGttSync::OAuth.qgis_oauth2_config('https://demo.example.org', 'cid')
+    # Persist across restarts (matches QTask's default) so an imported config
+    # doesn't re-authorize in the browser every launch.
+    assert_equal true, cfg[:persistToken]
+    # Authorization Code + PKCE, Bearer header, public client (no secret).
+    assert_equal 3, cfg[:grantFlow]
+    assert_equal 0, cfg[:accessMethod]
+    assert_nil cfg[:clientSecret]
+    assert_equal 'cid', cfg[:clientId]
+    assert_equal 'https://demo.example.org/oauth/authorize', cfg[:requestUrl]
+  end
+
   def test_ensure_qtask_application_creates_a_public_pkce_app
     app = RedmineGttSync::OAuth.ensure_qtask_application
     assert app.persisted?
