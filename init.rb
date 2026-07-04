@@ -82,29 +82,42 @@ begin
     end
   end
 
+  # Symlink into place, falling back to a copy where symlink creation is
+  # disallowed (e.g. some Docker volume mounts). Assumes the destination path is
+  # already clear. Used for both the stale-symlink refresh and the first link.
+  link_or_copy = lambda do
+    FileUtils.ln_s(plugin_assets_dir, public_assets_dir)
+  rescue Errno::EPERM, Errno::EACCES
+    copy_assets.call
+  end
+
   if File.directory?(plugin_assets_dir)
     FileUtils.mkdir_p(public_assets_dir.parent)
 
     if File.symlink?(public_assets_dir)
-      # Refresh an outdated symlink target.
-      link_target = begin
+      # Refresh only when the link resolves elsewhere; compare real paths so a
+      # symlinked plugin directory doesn't trigger a needless relink. Removing
+      # the link then re-linking falls back to a copy if linking is disallowed,
+      # so a symlink-hostile mount can't strand the destination empty.
+      current = begin
         File.realpath(public_assets_dir)
       rescue StandardError
         nil
       end
-      unless link_target == plugin_assets_dir
+      desired = begin
+        File.realpath(plugin_assets_dir)
+      rescue StandardError
+        plugin_assets_dir
+      end
+      unless current == desired
         FileUtils.rm_f(public_assets_dir)
-        FileUtils.ln_s(plugin_assets_dir, public_assets_dir)
+        link_or_copy.call
       end
     elsif File.exist?(public_assets_dir)
       # Keep copied assets in sync when a symlink is unavailable.
       copy_assets.call
     else
-      begin
-        FileUtils.ln_s(plugin_assets_dir, public_assets_dir)
-      rescue Errno::EPERM, Errno::EACCES
-        copy_assets.call
-      end
+      link_or_copy.call
     end
   end
 rescue StandardError => e
