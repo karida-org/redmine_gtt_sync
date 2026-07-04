@@ -16,6 +16,8 @@
 
   // Fallback for the rare non-secure context where navigator.clipboard is
   // absent (localhost and https are secure, so this seldom runs).
+  // Returns whether the copy actually succeeded, so callers only flash
+  // "Copied" on success.
   function legacyCopy(value) {
     var area = document.createElement('textarea');
     area.value = value;
@@ -24,11 +26,15 @@
     area.style.left = '-9999px';
     document.body.appendChild(area);
     area.select();
+    var ok = false;
     try {
-      document.execCommand('copy');
+      ok = document.execCommand('copy');
+    } catch (err) {
+      ok = false;
     } finally {
       document.body.removeChild(area);
     }
+    return ok;
   }
 
   function copyValue(button) {
@@ -43,11 +49,11 @@
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(value).then(done, function () {
-        legacyCopy(value);
-        done();
+        if (legacyCopy(value)) {
+          done();
+        }
       });
-    } else {
-      legacyCopy(value);
+    } else if (legacyCopy(value)) {
       done();
     }
   }

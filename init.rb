@@ -57,8 +57,23 @@ end
 # (e.g. a Docker volume mount).
 begin
   require 'fileutils'
-  plugin_assets_dir = Rails.root.join('plugins', 'redmine_gtt_sync', 'assets')
+  # Source is derived from this file's own location, so a differently named
+  # plugin directory (packaged, vendored, checked out elsewhere) still resolves.
+  # The destination uses the plugin id, which is what
+  # javascript_include_tag(plugin: 'redmine_gtt_sync') expects under
+  # public/plugin_assets/.
+  plugin_assets_dir = File.join(__dir__, 'assets')
   public_assets_dir = Rails.root.join('public', 'plugin_assets', 'redmine_gtt_sync')
+
+  # Copy assets into place atomically: populate a temp dir, then swap it in, so a
+  # failed or partial copy never leaves a half-populated (JS-404ing) directory.
+  copy_assets = lambda do
+    tmp_dir = "#{public_assets_dir}.tmp"
+    FileUtils.rm_rf(tmp_dir)
+    FileUtils.cp_r(plugin_assets_dir, tmp_dir)
+    FileUtils.rm_rf(public_assets_dir)
+    FileUtils.mv(tmp_dir, public_assets_dir)
+  end
 
   if File.directory?(plugin_assets_dir)
     FileUtils.mkdir_p(public_assets_dir.parent)
@@ -70,19 +85,18 @@ begin
       rescue StandardError
         nil
       end
-      unless link_target == plugin_assets_dir.to_s
+      unless link_target == plugin_assets_dir
         FileUtils.rm_f(public_assets_dir)
         FileUtils.ln_s(plugin_assets_dir, public_assets_dir)
       end
     elsif File.exist?(public_assets_dir)
       # Keep copied assets in sync when a symlink is unavailable.
-      FileUtils.rm_rf(public_assets_dir)
-      FileUtils.cp_r(plugin_assets_dir, public_assets_dir)
+      copy_assets.call
     else
       begin
         FileUtils.ln_s(plugin_assets_dir, public_assets_dir)
       rescue Errno::EPERM, Errno::EACCES
-        FileUtils.cp_r(plugin_assets_dir, public_assets_dir)
+        copy_assets.call
       end
     end
   end
