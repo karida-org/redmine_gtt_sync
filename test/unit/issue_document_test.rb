@@ -174,6 +174,37 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     assert_equal [{ 'id' => 4, 'name' => 'v1' }], refs['fixed_version_id']
   end
 
+  def test_user_custom_field_value_carries_value_options
+    field = OpenStruct.new(id: 7, name: 'Reviewer', field_format: 'user',
+                           multiple: false, possible_values: nil)
+    # possible_values_options yields [label, value] pairs for user/version fields,
+    # resolved against the issue (so the options are the ones assignable here).
+    field.stubs(:possible_values_options).returns([%w[Alice 3], %w[Bob 5]])
+    value = OpenStruct.new(custom_field: field, custom_field_id: 7, value: '3')
+    issue = fake_issue
+    issue.visible_custom_field_values = [value]
+
+    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields'][0]
+    assert_equal 'user', cf['field_format']
+    assert_equal(
+      [{ 'value' => '3', 'label' => 'Alice' }, { 'value' => '5', 'label' => 'Bob' }],
+      cf['value_options']
+    )
+  end
+
+  def test_list_custom_field_value_has_empty_value_options
+    field = OpenStruct.new(id: 5, name: 'Severity', field_format: 'list',
+                           multiple: false, possible_values: %w[Low High])
+    value = OpenStruct.new(custom_field: field, custom_field_id: 5, value: 'High')
+    issue = fake_issue
+    issue.visible_custom_field_values = [value]
+
+    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields'][0]
+    # list uses possible_values (strings); value_options stays empty.
+    assert_equal [], cf['value_options']
+    assert_equal %w[Low High], cf['possible_values']
+  end
+
   def test_custom_field_not_editable_is_marked_read_only
     field = OpenStruct.new(id: 5, name: 'Severity', field_format: 'list',
                            multiple: false, possible_values: [])

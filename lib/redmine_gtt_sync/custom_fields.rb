@@ -12,9 +12,31 @@ module RedmineGttSync
   module CustomFields
     module_function
 
+    # Reference-like formats store an id/key but display a name, so a client
+    # needs the selectable options to build a picker. A plain `list` uses its
+    # `possible_values` strings (value == label) and `bool` is handled
+    # client-side, so both are deliberately left out here.
+    REFERENCE_FORMATS = %w[user version enumeration].freeze
+
     # Lean shape for the bundle (whole loaded set): identity + type + value.
     def values(issue)
       issue.visible_custom_field_values.map { |value| base(value) }
+    end
+
+    # Selectable {value,label} options for a reference-like custom field,
+    # resolved in `context` (the issue, or a new issue for a project) so
+    # user/version options are scoped correctly. Empty for other formats, where
+    # a client uses `possible_values` instead. Redmine's possible_values_options
+    # yields [label, value] pairs for id-based formats; normalize to explicit
+    # {value,label} so the client never has to guess which half is which.
+    def value_options(field, context)
+      return [] unless context && REFERENCE_FORMATS.include?(field.field_format)
+
+      # possible_values_options can be nil for a format/context with no options.
+      Array(field.possible_values_options(context)).map do |option|
+        label, value = option.is_a?(Array) ? [option.first, option.last] : [option, option]
+        { 'value' => value.to_s, 'label' => label.to_s }
+      end
     end
 
     # Editing shape for the single issue document: adds the field's
@@ -30,6 +52,9 @@ module RedmineGttSync
         field = value.custom_field
         base(value).merge(
           'possible_values' => field.possible_values || [],
+          # Resolved against this issue, so user/version options are the ones
+          # actually assignable here.
+          'value_options' => value_options(field, issue),
           'writable' => editable_ids.include?(field.id)
         )
       end
