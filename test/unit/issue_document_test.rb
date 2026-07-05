@@ -179,7 +179,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
                            multiple: false, possible_values: nil)
     # possible_values_options yields [label, value] pairs for user/version fields,
     # resolved against the issue (so the options are the ones assignable here).
-    field.stubs(:possible_values_options).returns([['Alice', '3'], ['Bob', '5']])
+    field.stubs(:possible_values_options).returns([%w[Alice 3], %w[Bob 5]])
     value = OpenStruct.new(custom_field: field, custom_field_id: 7, value: '3')
     issue = fake_issue
     issue.visible_custom_field_values = [value]

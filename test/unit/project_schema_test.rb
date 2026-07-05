@@ -30,7 +30,7 @@ class RedmineGttSyncProjectSchemaTest < ActiveSupport::TestCase
     context = Object.new
     # possible_values_options yields [label, value] pairs for user/version fields.
     custom_field.stubs(:possible_values_options).with(context)
-                .returns([['Alice', '3'], ['Bob', '5']])
+                .returns([%w[Alice 3], %w[Bob 5]])
 
     hash = RedmineGttSync::ProjectSchema.custom_field_hash(custom_field, context)
     assert_equal 'user', hash['field_format']
