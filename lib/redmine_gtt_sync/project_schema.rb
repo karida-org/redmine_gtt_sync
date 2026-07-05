@@ -29,14 +29,17 @@ module RedmineGttSync
     def custom_fields(project, user)
       # A stand-in issue for this project so user/version option lists resolve to
       # this project's assignable users/versions (they need an object that
-      # responds to #project).
-      context = Issue.new(project: project)
+      # responds to #project). Carry the acting user so option resolution stays
+      # permission-consistent with writable_fields.
+      context = Issue.new(project: project, author: user)
       project.all_issue_custom_fields
              .select { |cf| cf.visible_by?(project, user) }
              .map { |cf| custom_field_hash(cf, context) }
     end
 
-    def custom_field_hash(custom_field, context)
+    # ``context`` is optional (defaults to no option resolution) so the public
+    # module_function API stays callable with just a custom field.
+    def custom_field_hash(custom_field, context = nil)
       {
         'id' => custom_field.id,
         'name' => custom_field.name,

@@ -30,9 +30,10 @@ module RedmineGttSync
     # yields [label, value] pairs for id-based formats; normalize to explicit
     # {value,label} so the client never has to guess which half is which.
     def value_options(field, context)
-      return [] unless REFERENCE_FORMATS.include?(field.field_format)
+      return [] unless context && REFERENCE_FORMATS.include?(field.field_format)
 
-      field.possible_values_options(context).map do |option|
+      # possible_values_options can be nil for a format/context with no options.
+      Array(field.possible_values_options(context)).map do |option|
         label, value = option.is_a?(Array) ? [option.first, option.last] : [option, option]
         { 'value' => value.to_s, 'label' => label.to_s }
       end

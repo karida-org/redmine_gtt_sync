@@ -21,6 +21,17 @@ class RedmineGttSyncProjectSchemaTest < ActiveSupport::TestCase
     assert_equal [1, 2], hash['tracker_ids']
   end
 
+  def test_custom_field_hash_without_context_is_backward_compatible
+    # Called with just the field (no context): the arity stays compatible and
+    # value_options is empty rather than raising on a nil context.
+    custom_field = OpenStruct.new(
+      id: 7, name: 'Reviewer', field_format: 'user', is_required: false,
+      multiple: false, possible_values: nil, trackers: []
+    )
+    hash = RedmineGttSync::ProjectSchema.custom_field_hash(custom_field)
+    assert_equal [], hash['value_options']
+  end
+
   def test_user_custom_field_hash_carries_value_options
     custom_field = OpenStruct.new(
       id: 7, name: 'Reviewer', field_format: 'user', is_required: false,
