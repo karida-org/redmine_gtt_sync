@@ -27,12 +27,16 @@ module RedmineGttSync
     end
 
     def custom_fields(project, user)
+      # A stand-in issue for this project so user/version option lists resolve to
+      # this project's assignable users/versions (they need an object that
+      # responds to #project).
+      context = Issue.new(project: project)
       project.all_issue_custom_fields
              .select { |cf| cf.visible_by?(project, user) }
-             .map { |cf| custom_field_hash(cf) }
+             .map { |cf| custom_field_hash(cf, context) }
     end
 
-    def custom_field_hash(custom_field)
+    def custom_field_hash(custom_field, context)
       {
         'id' => custom_field.id,
         'name' => custom_field.name,
@@ -40,6 +44,7 @@ module RedmineGttSync
         'required' => custom_field.is_required,
         'multiple' => custom_field.multiple,
         'possible_values' => custom_field.possible_values,
+        'value_options' => CustomFields.value_options(custom_field, context),
         'tracker_ids' => custom_field.trackers.map(&:id).sort
       }
     end
