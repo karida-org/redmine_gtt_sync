@@ -218,9 +218,9 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
 
   # -- change lines: reference-attribute labels -----------------------------
 
-  def build_change(detail)
+  def build_change(detail, base = 'https://x')
     # change is a public module function (module_function), so call it directly.
-    RedmineGttSync::IssueDocument.change(detail)
+    RedmineGttSync::IssueDocument.change(base, detail)
   end
 
   def test_change_resolves_reference_attribute_to_display_name
@@ -268,5 +268,35 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
                          old_value: nil, value: 'logo.png')
     refute build_change(cf).key?('new_label')
     refute build_change(att).key?('new_label')
+  end
+
+  def test_description_change_links_to_diff_and_omits_text
+    detail = OpenStruct.new(property: 'attr', prop_key: 'description',
+                            old_value: 'a very long old body',
+                            value: 'a very long new body',
+                            journal_id: 22, id: 34)
+    # A trailing slash on base must not double up in the URL.
+    change = build_change(detail, 'https://x/')
+    assert_equal 'https://x/journals/22/diff?detail_id=34', change['diff_url']
+    # The heavy before/after text is dropped in favour of the diff link.
+    refute change.key?('old_value')
+    refute change.key?('new_value')
+  end
+
+  # -- journals: private-note flag ------------------------------------------
+
+  def test_journal_carries_private_notes_flag
+    journal = OpenStruct.new(id: 7, user: nil, created_on: nil,
+                             notes: 'internal only', private_notes: true)
+    journal.stubs(:visible?).returns(true)
+    journal.stubs(:visible_details).returns([])
+    issue = fake_issue
+    issue.journals = [journal]
+
+    journals = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')[
+      'journals'
+    ]
+    assert_equal true, journals[0]['private_notes']
+    assert_equal 'internal only', journals[0]['notes']
   end
 end
