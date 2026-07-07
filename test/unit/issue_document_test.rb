@@ -219,7 +219,8 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   # -- change lines: reference-attribute labels -----------------------------
 
   def build_change(detail)
-    RedmineGttSync::IssueDocument.send(:change, detail)
+    # change is a public module function (module_function), so call it directly.
+    RedmineGttSync::IssueDocument.change(detail)
   end
 
   def test_change_resolves_reference_attribute_to_display_name
