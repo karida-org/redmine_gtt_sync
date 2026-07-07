@@ -158,7 +158,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
       fake_journal(notes: 'Not yours', editable: false, id: 2)
     ]
     journals = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['journals']
-    assert_equal [true, false], journals.map { |j| j['notes_editable'] }
+    assert_equal([true, false], journals.map { |j| j['notes_editable'] })
     # A false flag must survive .compact (only nil is dropped), so the client can
     # positively know it may NOT edit rather than guessing from a missing key.
     assert journals[1].key?('notes_editable')
@@ -338,6 +338,8 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     journal = OpenStruct.new(id: 7, user: nil, created_on: nil,
                              notes: 'internal only', private_notes: true)
     journal.stubs(:visible?).returns(true)
+    # journals now reads editable_by? for every visible note (notes_editable).
+    journal.stubs(:editable_by?).returns(false)
     journal.stubs(:visible_details).returns([])
     issue = fake_issue
     issue.journals = [journal]
