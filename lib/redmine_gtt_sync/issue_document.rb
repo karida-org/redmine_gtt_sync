@@ -175,10 +175,13 @@ module RedmineGttSync
           # (visible? above), but the client still needs the flag to mark it.
           'private_notes' => journal.private_notes,
           # Whether THIS user may edit (or clear = delete) this note's text.
-          # editable_by? covers edit_issue_notes (any) and edit_own_issue_notes
-          # (own); the client shows Edit/Delete only when true, Redmine enforces
-          # the same on the stock PUT /journals/:id.json write.
-          'notes_editable' => journal.editable_by?(user),
+          # Only meaningful when there IS note text (a pure property-change entry
+          # has nothing to edit), so it's omitted for note-less journals to keep
+          # the per-note semantics unambiguous. editable_by? covers
+          # edit_issue_notes (any) and edit_own_issue_notes (own); the client
+          # shows Edit/Delete only when true, Redmine enforces the same on the
+          # stock PUT /journals/:id.json write.
+          'notes_editable' => (journal.editable_by?(user) if journal.notes.present?),
           'details' => journal.visible_details(user).map do |detail|
             change(base, detail, label_cache)
           end

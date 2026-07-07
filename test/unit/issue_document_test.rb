@@ -164,6 +164,16 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     assert journals[1].key?('notes_editable')
   end
 
+  def test_note_less_journal_omits_notes_editable
+    # A pure property-change entry (no note text) has nothing to edit, so
+    # notes_editable is omitted rather than advertised ambiguously.
+    issue = fake_issue
+    issue.journals = [fake_journal(notes: nil, editable: true, id: 3)]
+    journal = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['journals'][0]
+    refute journal.key?('notes_editable')
+    refute journal.key?('notes')
+  end
+
   def test_custom_field_values_carry_format_multiple_and_edit_metadata
     field = OpenStruct.new(
       id: 5, name: 'Severity', field_format: 'list', multiple: false,
