@@ -165,14 +165,29 @@ module RedmineGttSync
           'user' => reference(base, 'users', journal.user),
           'created_on' => journal.created_on&.iso8601,
           'notes' => journal.notes.presence,
+          # A private note is only ever in this payload if the user may see it
+          # (visible? above), but the client still needs the flag to mark it.
+          'private_notes' => journal.private_notes,
           'details' => journal.visible_details(user).map do |detail|
-            change(detail, label_cache)
+            change(base, detail, label_cache)
           end
         }.compact
       end
     end
 
-    def change(detail, label_cache = {})
+    def change(base, detail, label_cache = {})
+      # A description edit (and other long-text) carries a large before/after
+      # that is noise inline; link to Redmine's own diff page instead of shipping
+      # the full text. Redmine renders exactly this diff at journals/:id/diff.
+      if diffable?(detail) && detail.journal_id && detail.id
+        return {
+          'property' => detail.property,
+          'name' => detail.prop_key,
+          'diff_url' =>
+            "#{base}/journals/#{detail.journal_id}/diff?detail_id=#{detail.id}"
+        }
+      end
+
       change = {
         'property' => detail.property,
         'name' => detail.prop_key,
@@ -189,6 +204,13 @@ module RedmineGttSync
       change['old_label'] = old_label if old_label
       change['new_label'] = new_label if new_label
       change
+    end
+
+    # A change whose value is long text best shown as a diff rather than inline:
+    # the issue description today. (Long-text custom fields could join later; the
+    # client falls back to the inline value when there is no diff_url.)
+    def diffable?(detail)
+      detail.property == 'attr' && detail.prop_key.to_s == 'description'
     end
 
     # The display name for a reference-attribute change value, or nil when it
