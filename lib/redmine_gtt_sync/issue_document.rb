@@ -166,12 +166,50 @@ module RedmineGttSync
     end
 
     def change(detail)
-      {
+      change = {
         'property' => detail.property,
         'name' => detail.prop_key,
         'old_value' => detail.old_value,
         'new_value' => detail.value
       }
+      # For reference attributes (status_id, assigned_to_id, ...) the raw values
+      # are record ids, which read as noise in a client's history. Resolve them
+      # to display names here, where we can honour deletions and don't force the
+      # client to fetch and join the status/user/version/... dictionaries. Only
+      # added when resolvable, so old_value/new_value stay authoritative.
+      old_label = reference_label(detail, detail.old_value)
+      new_label = reference_label(detail, detail.value)
+      change['old_label'] = old_label if old_label
+      change['new_label'] = new_label if new_label
+      change
+    end
+
+    # The display name for a reference-attribute change value, or nil when it
+    # isn't a resolvable reference (a literal like done_ratio, a custom field, an
+    # attachment) or the referenced record is gone. Mirrors how Redmine's own
+    # history resolves an "<assoc>_id" attribute against its association, so the
+    # labels match the web UI (and honour records deleted since the change).
+    def reference_label(detail, value)
+      return nil unless detail.property == 'attr'
+
+      key = detail.prop_key.to_s
+      return nil unless value.present? && key.end_with?('_id')
+
+      association = Issue.reflect_on_association(key.sub(/_id\z/, '').to_sym)
+      return nil unless association
+
+      record = association.klass.find_by(id: value)
+      return nil unless record
+
+      if record.respond_to?(:name)
+        record.name
+      elsif record.respond_to?(:subject)
+        record.subject
+      else
+        record.to_s
+      end
+    rescue StandardError
+      nil # never let a label lookup break the document
     end
 
     # Issue relations, only to issues the user can see.
