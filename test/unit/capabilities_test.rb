@@ -79,6 +79,11 @@ class RedmineGttSyncCapabilitiesTest < ActiveSupport::TestCase
     assert_includes oauth[:scopes], 'set_notes_private'
     # The issue Private flag (is_private) is scope-gated the same way.
     assert_includes oauth[:scopes], 'set_issues_private'
+    # Destructive/edit actions (epic karida-org/qtask#167): delete an issue, and
+    # edit or clear (= delete) a note. All three are real Redmine permissions.
+    assert_includes oauth[:scopes], 'delete_issues'
+    assert_includes oauth[:scopes], 'edit_issue_notes'
+    assert_includes oauth[:scopes], 'edit_own_issue_notes'
   end
 
   def test_oauth_advertisement_omits_client_secret_and_id_by_default

@@ -10,24 +10,30 @@ module RedmineGttSync
   # (e.g. adding :add_issue_notes) without a client release.
   module OAuth
     # Ordered so the advertised list is stable across requests. Least privilege
-    # for the QTask (QGIS) client: list/pick projects, read/create/edit issues,
-    # work with notes (public and private), set the issue Private flag, read GTT
-    # styling, and pass the gtt_sync integration gate.
+    # for the QTask (QGIS) client: list/pick projects, read/create/edit/delete
+    # issues, work with notes (add, edit/delete, private), set the issue Private
+    # flag, read GTT styling, and pass the gtt_sync integration gate.
     #
     # Notes need explicit scopes: over OAuth, Redmine gates permissions by the
     # token's scopes even for an admin, so edit_issues alone only lets a *public*
     # note through - add_issue_notes/view_private_notes/set_notes_private are
-    # required for the panel's note features (add, see, and mark private). Adding
-    # a scope here widens the OAuth app and the advertised list; existing
-    # connections re-authorize when scope drift is detected.
+    # required for the panel's note features (add, see, and mark private), and
+    # edit_issue_notes/edit_own_issue_notes for editing or clearing (= deleting)
+    # a note via the stock PUT /journals/:id write. delete_issues gates issue
+    # deletion. Every scope here maps to a real Redmine permission (Doorkeeper
+    # scopes = AccessControl.permissions). Adding a scope widens the OAuth app
+    # and the advertised list; existing connections re-authorize on scope drift.
     SCOPES = %w[
       view_project
       search_project
       view_issues
       add_issues
       edit_issues
+      delete_issues
       set_issues_private
       add_issue_notes
+      edit_issue_notes
+      edit_own_issue_notes
       view_private_notes
       set_notes_private
       view_gtt_settings

@@ -92,6 +92,12 @@ module RedmineGttSync
       writable = issue.safe_attribute_names(user)
       {
         'fields' => writable,
+        # Issue-level action permissions, delegated to Redmine so the client can
+        # offer delete/add-note only when the user's role allows it (Redmine
+        # still enforces on write). deletable? -> :delete_issues,
+        # notes_addable? -> :add_issue_notes, both role + per-tracker scoped.
+        'can_delete' => issue.deletable?(user),
+        'can_add_notes' => issue.notes_addable?(user),
         'status_transitions' => issue.new_statuses_allowed_to(user).map do |status|
           { 'id' => status.id, 'name' => status.name }
         end,
@@ -168,6 +174,11 @@ module RedmineGttSync
           # A private note is only ever in this payload if the user may see it
           # (visible? above), but the client still needs the flag to mark it.
           'private_notes' => journal.private_notes,
+          # Whether THIS user may edit (or clear = delete) this note's text.
+          # editable_by? covers edit_issue_notes (any) and edit_own_issue_notes
+          # (own); the client shows Edit/Delete only when true, Redmine enforces
+          # the same on the stock PUT /journals/:id.json write.
+          'notes_editable' => journal.editable_by?(user),
           'details' => journal.visible_details(user).map do |detail|
             change(base, detail, label_cache)
           end

@@ -51,10 +51,29 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     issue.stubs(:new_statuses_allowed_to).returns(
       [OpenStruct.new(id: 1, name: 'New'), OpenStruct.new(id: 2, name: 'In Progress')]
     )
+    # Issue-level action permissions also take a user arg; default to allowed
+    # (tests that check gating override these).
+    issue.stubs(:deletable?).returns(true)
+    issue.stubs(:notes_addable?).returns(true)
     # editable_custom_field_values(user) drives the per-field `writable` flag;
     # default to none editable (tests that check it override this).
     issue.stubs(:editable_custom_field_values).returns([])
     issue
+  end
+
+  # A lightweight stand-in for a visible journal note.
+  def fake_journal(notes:, editable:, id: 1)
+    journal = OpenStruct.new(
+      id: id,
+      user: OpenStruct.new(id: 7, name: 'Dev'),
+      created_on: Time.utc(2026, 7, 2, 10, 0, 0),
+      notes: notes,
+      private_notes: false
+    )
+    journal.stubs(:visible?).returns(true)
+    journal.stubs(:editable_by?).returns(editable)
+    journal.stubs(:visible_details).returns([])
+    journal
   end
 
   def test_builds_identity_references_and_geometry
@@ -113,6 +132,36 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
       ['New', 'In Progress'],
       doc['editable']['status_transitions'].map { |s| s['name'] }
     )
+  end
+
+  def test_editable_contract_advertises_delete_and_add_notes_permissions
+    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://x')
+    assert_equal true, doc['editable']['can_delete']
+    assert_equal true, doc['editable']['can_add_notes']
+  end
+
+  def test_editable_action_permissions_reflect_the_user_role
+    # A user Redmine forbids from deleting/adding-notes gets false, so the client
+    # hides those actions (Redmine still enforces on write).
+    issue = fake_issue
+    issue.stubs(:deletable?).returns(false)
+    issue.stubs(:notes_addable?).returns(false)
+    doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')
+    assert_equal false, doc['editable']['can_delete']
+    assert_equal false, doc['editable']['can_add_notes']
+  end
+
+  def test_journal_carries_notes_editable_flag
+    issue = fake_issue
+    issue.journals = [
+      fake_journal(notes: 'Looks fixed', editable: true, id: 1),
+      fake_journal(notes: 'Not yours', editable: false, id: 2)
+    ]
+    journals = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['journals']
+    assert_equal [true, false], journals.map { |j| j['notes_editable'] }
+    # A false flag must survive .compact (only nil is dropped), so the client can
+    # positively know it may NOT edit rather than guessing from a missing key.
+    assert journals[1].key?('notes_editable')
   end
 
   def test_custom_field_values_carry_format_multiple_and_edit_metadata
