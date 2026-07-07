@@ -1,10 +1,14 @@
 name: Test
 
+# Runs on PRs to main only (not also on the post-merge push) to conserve Actions
+# minutes on this private repo while the monthly quota is tight. The full
+# Redmine 6.1 + 7.0 matrix is kept (7.0 is the forward target). Re-add
+# `push: branches: [main]` (or make the repo public, where Actions is free) once
+# the budget allows. workflow_dispatch lets the check be run on demand.
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
