@@ -26,6 +26,7 @@ module RedmineGttSync
       view_issues
       add_issues
       edit_issues
+      set_issues_private
       add_issue_notes
       view_private_notes
       set_notes_private

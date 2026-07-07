@@ -77,6 +77,8 @@ class RedmineGttSyncCapabilitiesTest < ActiveSupport::TestCase
     assert_includes oauth[:scopes], 'add_issue_notes'
     assert_includes oauth[:scopes], 'view_private_notes'
     assert_includes oauth[:scopes], 'set_notes_private'
+    # The issue Private flag (is_private) is scope-gated the same way.
+    assert_includes oauth[:scopes], 'set_issues_private'
   end
 
   def test_oauth_advertisement_omits_client_secret_and_id_by_default
