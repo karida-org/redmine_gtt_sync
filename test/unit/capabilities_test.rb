@@ -72,6 +72,11 @@ class RedmineGttSyncCapabilitiesTest < ActiveSupport::TestCase
     # The integration gate scope must be advertised, else a scoped token 403s.
     assert_includes oauth[:scopes], 'use_gtt_sync'
     assert_includes oauth[:scopes], 'view_issues'
+    # Note scopes: over OAuth these gate note features even for an admin, so a
+    # scoped token can otherwise only save public notes.
+    assert_includes oauth[:scopes], 'add_issue_notes'
+    assert_includes oauth[:scopes], 'view_private_notes'
+    assert_includes oauth[:scopes], 'set_notes_private'
   end
 
   def test_oauth_advertisement_omits_client_secret_and_id_by_default
