@@ -154,24 +154,84 @@ module RedmineGttSync
     # Notes + change history, only the entries visible to the user (private notes
     # and role-restricted detail changes are filtered by Redmine).
     def journals(base, issue, user)
+      # One label cache per document build: reference changes repeat the same
+      # few records across a history (a handful of statuses, assignees, ...), so
+      # memoizing by [association, id] collapses the per-detail lookups instead
+      # of hitting the DB twice for every detail.
+      label_cache = {}
       issue.journals.select { |journal| journal.visible?(user) }.map do |journal|
         {
           'id' => journal.id,
           'user' => reference(base, 'users', journal.user),
           'created_on' => journal.created_on&.iso8601,
           'notes' => journal.notes.presence,
-          'details' => journal.visible_details(user).map { |detail| change(detail) }
+          'details' => journal.visible_details(user).map do |detail|
+            change(detail, label_cache)
+          end
         }.compact
       end
     end
 
-    def change(detail)
-      {
+    def change(detail, label_cache = {})
+      change = {
         'property' => detail.property,
         'name' => detail.prop_key,
         'old_value' => detail.old_value,
         'new_value' => detail.value
       }
+      # For reference attributes (status_id, assigned_to_id, ...) the raw values
+      # are record ids, which read as noise in a client's history. Resolve them
+      # to display names here, where we can honour deletions and don't force the
+      # client to fetch and join the status/user/version/... dictionaries. Only
+      # added when resolvable, so old_value/new_value stay authoritative.
+      old_label = reference_label(detail, detail.old_value, label_cache)
+      new_label = reference_label(detail, detail.value, label_cache)
+      change['old_label'] = old_label if old_label
+      change['new_label'] = new_label if new_label
+      change
+    end
+
+    # The display name for a reference-attribute change value, or nil when it
+    # isn't a resolvable reference (a literal like done_ratio, a custom field, an
+    # attachment) or the referenced record is gone. Mirrors how Redmine's own
+    # history resolves an "<assoc>_id" attribute against its association, so the
+    # labels match the web UI (and honour records deleted since the change).
+    # ``label_cache`` memoizes [association, id] lookups across a document build.
+    def reference_label(detail, value, label_cache = {})
+      return nil unless detail.property == 'attr'
+
+      key = detail.prop_key.to_s
+      return nil unless value.present? && key.end_with?('_id')
+
+      assoc_name = key.sub(/_id\z/, '').to_sym
+      cache_key = [assoc_name, value.to_s]
+      return label_cache[cache_key] if label_cache.key?(cache_key)
+
+      label_cache[cache_key] = resolve_reference_name(assoc_name, value)
+    end
+
+    def resolve_reference_name(assoc_name, value)
+      association = Issue.reflect_on_association(assoc_name)
+      return nil unless association
+
+      record = association.klass.find_by(id: value)
+      return nil unless record
+
+      if record.respond_to?(:name)
+        record.name
+      elsif record.respond_to?(:subject)
+        record.subject
+      else
+        record.to_s
+      end
+    rescue StandardError => e
+      # Never let a label lookup break the document, but leave a trace so a real
+      # reflection/query fault is diagnosable rather than silently swallowed.
+      Rails.logger&.warn(
+        "[gtt_sync] reference label lookup failed for #{assoc_name}=#{value}: " \
+        "#{e.class}: #{e.message}"
+      )
+      nil
     end
 
     # Issue relations, only to issues the user can see.

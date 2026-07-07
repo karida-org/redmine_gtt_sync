@@ -215,4 +215,58 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields']
     assert_equal false, cf[0]['writable']
   end
+
+  # -- change lines: reference-attribute labels -----------------------------
+
+  def build_change(detail)
+    # change is a public module function (module_function), so call it directly.
+    RedmineGttSync::IssueDocument.change(detail)
+  end
+
+  def test_change_resolves_reference_attribute_to_display_name
+    detail = OpenStruct.new(property: 'attr', prop_key: 'status_id',
+                            old_value: '1', value: '2')
+    klass = mock
+    klass.stubs(:find_by).with(id: '1').returns(OpenStruct.new(name: 'New'))
+    klass.stubs(:find_by).with(id: '2').returns(OpenStruct.new(name: 'In Progress'))
+    Issue.stubs(:reflect_on_association).with(:status)
+         .returns(OpenStruct.new(klass: klass))
+
+    change = build_change(detail)
+    # Raw ids stay authoritative; labels are added alongside.
+    assert_equal '1', change['old_value']
+    assert_equal '2', change['new_value']
+    assert_equal 'New', change['old_label']
+    assert_equal 'In Progress', change['new_label']
+  end
+
+  def test_change_reference_label_omitted_when_record_deleted
+    detail = OpenStruct.new(property: 'attr', prop_key: 'fixed_version_id',
+                            old_value: nil, value: '99')
+    klass = mock
+    klass.stubs(:find_by).with(id: '99').returns(nil) # version removed since
+    Issue.stubs(:reflect_on_association).with(:fixed_version)
+         .returns(OpenStruct.new(klass: klass))
+
+    change = build_change(detail)
+    assert_equal '99', change['new_value']
+    refute change.key?('new_label'), 'no label for a deleted record'
+    refute change.key?('old_label')
+  end
+
+  def test_change_literal_attribute_gets_no_label
+    detail = OpenStruct.new(property: 'attr', prop_key: 'done_ratio',
+                            old_value: '0', value: '30')
+    change = build_change(detail)
+    assert_equal({ 'property' => 'attr', 'name' => 'done_ratio',
+                   'old_value' => '0', 'new_value' => '30' }, change)
+  end
+
+  def test_change_custom_field_and_attachment_get_no_reference_label
+    cf = OpenStruct.new(property: 'cf', prop_key: '1', old_value: '2', value: '3')
+    att = OpenStruct.new(property: 'attachment', prop_key: '4',
+                         old_value: nil, value: 'logo.png')
+    refute build_change(cf).key?('new_label')
+    refute build_change(att).key?('new_label')
+  end
 end
