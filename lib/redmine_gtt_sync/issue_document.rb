@@ -184,7 +184,8 @@ module RedmineGttSync
           'property' => detail.property,
           'name' => detail.prop_key,
           'diff_url' =>
-            "#{base}/journals/#{detail.journal_id}/diff?detail_id=#{detail.id}"
+            "#{base.to_s.chomp('/')}/journals/#{detail.journal_id}" \
+            "/diff?detail_id=#{detail.id}"
         }
       end
 

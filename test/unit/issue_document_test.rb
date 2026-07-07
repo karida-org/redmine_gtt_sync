@@ -275,7 +275,8 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
                             old_value: 'a very long old body',
                             value: 'a very long new body',
                             journal_id: 22, id: 34)
-    change = build_change(detail, 'https://x')
+    # A trailing slash on base must not double up in the URL.
+    change = build_change(detail, 'https://x/')
     assert_equal 'https://x/journals/22/diff?detail_id=34', change['diff_url']
     # The heavy before/after text is dropped in favour of the diff link.
     refute change.key?('old_value')
