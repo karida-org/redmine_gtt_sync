@@ -38,7 +38,9 @@ module RedmineGttSync
         # Report redmine_gtt's version, not just presence: the base geo surface
         # depends on it, so a client may need to know which release is running.
         requires: { redmine_gtt: gtt_present, redmine_gtt_version: gtt&.version&.to_s },
-        capabilities: base_capabilities(gtt_present).merge(contract_capabilities),
+        capabilities: base_capabilities(gtt_present)
+          .merge(contract_capabilities)
+          .merge(behavior_capabilities),
         # OAuth2 setup parameters so a client can build its auth config without
         # the user knowing the scopes/endpoints. Public probe: scopes/endpoints
         # always, plus the client_id only when an admin selected a public app to
@@ -81,6 +83,16 @@ module RedmineGttSync
     # This plugin's contract endpoints: advertised iff their route is defined.
     def contract_capabilities
       CONTRACT_ROUTES.transform_values { |route_name| route_defined?(route_name) }
+    end
+
+    # Behaviours of existing endpoints (not new routes, so they can't be
+    # route-detected). query_scoped_bundle: the bundle endpoints accept an
+    # optional query_id and the all-projects bundle accepts none (project /
+    # all-projects scope x optional saved query). A client must feature-detect
+    # this before passing query_id, since an older server would silently ignore
+    # it and return an unfiltered bundle.
+    def behavior_capabilities
+      { query_scoped_bundle: true }
     end
 
     def route_defined?(route_name)

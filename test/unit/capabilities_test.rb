@@ -56,6 +56,13 @@ class RedmineGttSyncCapabilitiesTest < ActiveSupport::TestCase
     assert @report[:capabilities][:query_bundle]
   end
 
+  def test_report_advertises_query_scoped_bundle_behavior
+    # A behaviour of existing routes (optional query_id + all-projects scope),
+    # not a new route, so it's a flag a client feature-detects before passing
+    # query_id (an older server would silently ignore it).
+    assert_equal true, @report[:capabilities][:query_scoped_bundle]
+  end
+
   def test_capabilities_probe_route_is_detected
     # Sanity-check the detection predicate against a route that does exist.
     assert RedmineGttSync::Capabilities.route_defined?(:gtt_sync_capabilities)

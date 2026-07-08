@@ -23,10 +23,27 @@ class GttSyncQueryBundleTest < ActionController::TestCase
     geometry + json['issues']['unplaced'].size
   end
 
-  test 'query_id is required' do
+  test 'without query_id returns the all-projects bundle' do
+    # No query_id is now valid: the "All projects, no query" scope. Shape only -
+    # the per-project use_gtt_sync gate (module enablement) is covered by the
+    # dedicated tests below, so the count is not asserted here.
     @request.session[:user_id] = 1
     get :query_bundle
-    assert_response :bad_request
+    assert_response :success
+    json = JSON.parse(response.body)
+    assert json['issues'].key?('point')
+    assert json['issues'].key?('unplaced')
+    assert json.key?('project_boundary')
+  end
+
+  test 'without query_id includes issues where the user holds use_gtt_sync' do
+    Role.find(1).add_permission!(:use_gtt_sync)
+    project = Project.find(1)
+    project.enabled_module_names = project.enabled_module_names | ['gtt_sync']
+    @request.session[:user_id] = 2 # jsmith is a member of project 1 via role 1
+    get :query_bundle
+    assert_response :success
+    assert_operator issue_count(JSON.parse(response.body)), :>, 0
   end
 
   test 'unknown query is 404' do

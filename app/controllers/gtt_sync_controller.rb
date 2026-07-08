@@ -37,12 +37,25 @@ class GttSyncController < ApplicationController
     # Eager-load the custom-value associations the bundle serializes
     # (visible_custom_field_values per issue), so a large project doesn't fan
     # out into an N+1 of per-issue custom-value/custom-field queries.
-    issues = project.issues.visible.preload(custom_values: :custom_field).to_a
+    #
+    # Optional query_id narrows the project by a saved query's filters, run in
+    # this project's context (mirrors Redmine's projects/:id/issues?query_id=N);
+    # without it the whole project loads. Both query.issues and
+    # project.issues.visible are view_issues-scoped, so visibility holds either
+    # way. use_gtt_sync + view_issues for this single project were checked above.
+    if params[:query_id].present?
+      query = IssueQuery.visible.find(params[:query_id])
+      query.project = project
+      issues = query.issues
+    else
+      issues = project.issues.visible.to_a
+    end
+    preload_issue_custom_values(issues)
     render json: RedmineGttSync::ProjectBundle.build(
       project, issues, base_url: canonical_base_url
     )
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Project not found' }, status: :not_found
+    render json: { error: 'Project or query not found' }, status: :not_found
   end
 
   # Per-project editing schema (trackers/statuses/custom fields/writable fields)
@@ -56,38 +69,50 @@ class GttSyncController < ApplicationController
     render json: { error: 'Project not found' }, status: :not_found
   end
 
-  # Any saved query as one bundle: issues split by geometry + unplaced, the
-  # boundaries of every project represented, and a project directory. The query
-  # generalizes the project bundle (project load == query with a project filter)
-  # and may be cross-project or global, so there is no single project to gate on.
+  # All-projects bundle: issues split by geometry + unplaced, the boundaries of
+  # every project represented, and a project directory. Optional query_id
+  # applies a saved query's filters across every project the user may integrate
+  # with (mirrors Redmine's issues?query_id=N); without it, all visible issues
+  # load (the "All projects, no query" scope). Cross-project by nature, so it is
+  # gated per project rather than on a single one.
   def query_bundle
-    if params[:query_id].blank?
-      render json: { error: 'query_id is required' }, status: :bad_request
-      return
-    end
-
-    query = IssueQuery.visible.find(params[:query_id])
-    # query.issues is already view_issues-scoped; layer use_gtt_sync per project
-    # (project-scoped permission) so a cross-project query only yields issues
-    # from projects the user may integrate with. Check each distinct project once.
-    all_issues = query.issues
-    projects = all_issues.map(&:project).uniq
-    allowed = projects.select { |project| User.current.allowed_to?(:use_gtt_sync, project) }
-    allowed_ids = allowed.map(&:id).to_set
-    issues = all_issues.select { |issue| allowed_ids.include?(issue.project_id) }
-    # query.issues is an array, so preload the custom-value associations the
-    # bundle serializes on the final set (not the discarded cross-project ones)
-    # to avoid an N+1 of per-issue custom-value/custom-field queries.
-    ActiveRecord::Associations::Preloader.new(
-      records: issues, associations: { custom_values: :custom_field }
-    ).call
-
+    all_issues = if params[:query_id].present?
+                   IssueQuery.visible.find(params[:query_id]).issues
+                 else
+                   Issue.visible.to_a
+                 end
+    # Both query.issues and Issue.visible are view_issues-scoped; layer
+    # use_gtt_sync per project (a project-scoped permission) so only issues from
+    # projects the user may integrate with are returned.
+    issues = filter_issues_by_gtt_sync(all_issues)
+    preload_issue_custom_values(issues)
     render json: RedmineGttSync::QueryBundle.build(issues, base_url: canonical_base_url)
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Query not found' }, status: :not_found
   end
 
   private
+
+  # Keep to issues in projects where the current user holds use_gtt_sync
+  # (project-scoped), checking each distinct project once. Used by the
+  # cross-project / all-projects bundle where there is no single gate project.
+  def filter_issues_by_gtt_sync(issues)
+    projects = issues.map(&:project).uniq
+    allowed_ids = projects
+                  .select { |project| User.current.allowed_to?(:use_gtt_sync, project) }
+                  .map(&:id)
+                  .to_set
+    issues.select { |issue| allowed_ids.include?(issue.project_id) }
+  end
+
+  # Preload the custom-value associations the bundle serializes, so a large
+  # result doesn't fan out into an N+1 of per-issue custom-value/field queries.
+  # Takes an array (query.issues / *.to_a), so a relation preload won't do.
+  def preload_issue_custom_values(issues)
+    ActiveRecord::Associations::Preloader.new(
+      records: issues, associations: { custom_values: :custom_field }
+    ).call
+  end
 
   # Governance gate: integration access requires BOTH
   # - :use_gtt_sync (which already encompasses the gtt_sync module being enabled:
