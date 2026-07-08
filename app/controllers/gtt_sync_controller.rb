@@ -76,18 +76,18 @@ class GttSyncController < ApplicationController
   # load (the "All projects, no query" scope). Cross-project by nature, so it is
   # gated per project rather than on a single one.
   def query_bundle
-    if params[:query_id].present?
-      # A saved query runs across all projects it spans; gate the resulting
-      # (already-materialized) array by use_gtt_sync in Ruby.
-      issues = filter_issues_by_gtt_sync(
-        IssueQuery.visible.find(params[:query_id]).issues
-      )
-    else
-      # All projects, no query: push the use_gtt_sync gate into the DB - only
-      # issues from projects the user may integrate with - rather than loading
-      # every visible issue instance-wide and filtering in Ruby.
-      issues = Issue.visible.where(project_id: gtt_sync_project_ids).to_a
-    end
+    issues =
+      if params[:query_id].present?
+        # A saved query runs across all projects it spans; gate the resulting
+        # (already-materialized) array by use_gtt_sync in Ruby.
+        query = IssueQuery.visible.find(params[:query_id])
+        filter_issues_by_gtt_sync(query.issues)
+      else
+        # All projects, no query: push the use_gtt_sync gate into the DB - only
+        # issues from projects the user may integrate with - rather than loading
+        # every visible issue instance-wide and filtering in Ruby.
+        Issue.visible.where(project_id: gtt_sync_project_ids).to_a
+      end
     preload_issue_associations(issues)
     render json: RedmineGttSync::QueryBundle.build(issues, base_url: canonical_base_url)
   rescue ActiveRecord::RecordNotFound
