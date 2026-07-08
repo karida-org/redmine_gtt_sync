@@ -16,6 +16,13 @@ class GttSyncControllerTest < ActionController::TestCase
     project.enabled_module_names = project.enabled_module_names | ['gtt_sync']
   end
 
+  def issue_count(json)
+    geometry = %w[point line polygon].sum do |kind|
+      json['issues'][kind]['features'].size
+    end
+    geometry + json['issues']['unplaced'].size
+  end
+
   test 'resolves a project by identifier' do
     @request.session[:user_id] = 1
     get :project_bundle, params: { id: 'ecookbook' }
@@ -35,6 +42,29 @@ class GttSyncControllerTest < ActionController::TestCase
   test 'unknown project returns 404' do
     @request.session[:user_id] = 1
     get :project_bundle, params: { id: 'no-such-project' }
+    assert_response :not_found
+  end
+
+  test 'project_bundle applies an optional query filter within the project' do
+    @request.session[:user_id] = 1
+    get :project_bundle, params: { id: 'ecookbook' }
+    assert_operator issue_count(JSON.parse(response.body)), :>, 0
+
+    # A query whose filter matches nothing, run in the project's context, must
+    # narrow the bundle to zero - proving the query_id is actually applied.
+    query = IssueQuery.new(
+      name: 'no match', user: User.find(1), visibility: Query::VISIBILITY_PUBLIC
+    )
+    query.add_filter('subject', '~', ['zzz-no-such-subject-zzz'])
+    query.save!
+    get :project_bundle, params: { id: 'ecookbook', query_id: query.id }
+    assert_response :success
+    assert_equal 0, issue_count(JSON.parse(response.body))
+  end
+
+  test 'project_bundle with an unknown query is 404' do
+    @request.session[:user_id] = 1
+    get :project_bundle, params: { id: 'ecookbook', query_id: 999_999 }
     assert_response :not_found
   end
 
