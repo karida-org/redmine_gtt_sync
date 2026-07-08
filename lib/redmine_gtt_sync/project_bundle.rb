@@ -62,6 +62,17 @@ module RedmineGttSync
     # package built from it - has them without an N+1 per-issue fetch. The client
     # writes them to a related table, not flat columns (applicability and
     # multi-value don't fit a uniform schema).
+    #
+    # priority/assigned_to/category/fixed_version are sent as display NAMES (not
+    # ids like status/tracker): the client resolves status and tracker via gtt
+    # settings for their colour/icon, but has no client-side lookup for these and
+    # the issue list only needs a label. start_date/due_date/done_ratio/
+    # estimated_hours and the created_on/updated_on timestamps are literals (ISO
+    # for dates/times) so they render and sort directly as optional list columns.
+    # All are optional on the client, so an older server that omits them just
+    # leaves those columns blank. The reference associations are preloaded in the
+    # controller (preload_issue_associations) to keep a large bundle from fanning
+    # out into per-issue N+1 lookups.
     def summary(issue)
       {
         'id' => issue.id,
@@ -69,6 +80,16 @@ module RedmineGttSync
         'subject' => issue.subject,
         'status_id' => issue.status_id,
         'tracker_id' => issue.tracker_id,
+        'priority' => issue.priority&.name,
+        'assigned_to' => issue.assigned_to&.name,
+        'category' => issue.category&.name,
+        'fixed_version' => issue.fixed_version&.name,
+        'start_date' => issue.start_date&.iso8601,
+        'due_date' => issue.due_date&.iso8601,
+        'done_ratio' => issue.done_ratio,
+        'estimated_hours' => issue.estimated_hours,
+        'created_on' => issue.created_on&.iso8601,
+        'updated_on' => issue.updated_on&.iso8601,
         'lock_version' => issue.lock_version,
         'custom_fields' => CustomFields.values(issue)
       }
