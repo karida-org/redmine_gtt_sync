@@ -76,16 +76,21 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
   def test_summary_carries_standard_list_fields
     # Reference fields ship as display names; dates/times as ISO; done_ratio and
     # estimated_hours as literals. These back the optional issue-list columns.
-    issues = [issue(
-      1, geom: factory.point(1.0, 2.0),
-      priority: named('High'), assigned_to: named('Alice'),
-      category: named('Roads'), fixed_version: named('v2'),
-      start_date: Date.new(2026, 7, 1), due_date: Date.new(2026, 7, 9),
-      done_ratio: 40, estimated_hours: 3.5,
+    built = issue(
+      1,
+      geom: factory.point(1.0, 2.0),
+      priority: named('High'),
+      assigned_to: named('Alice'),
+      category: named('Roads'),
+      fixed_version: named('v2'),
+      start_date: Date.new(2026, 7, 1),
+      due_date: Date.new(2026, 7, 9),
+      done_ratio: 40,
+      estimated_hours: 3.5,
       created_on: Time.utc(2026, 6, 1, 8, 0, 0),
       updated_on: Time.utc(2026, 6, 2, 9, 30, 0)
-    )]
-    props = build(issues)['issues']['point']['features'][0]['properties']
+    )
+    props = build([built])['issues']['point']['features'][0]['properties']
     assert_equal 'High', props['priority']
     assert_equal 'Alice', props['assigned_to']
     assert_equal 'Roads', props['category']
