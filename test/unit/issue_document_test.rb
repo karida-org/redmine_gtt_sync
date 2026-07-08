@@ -173,8 +173,8 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
       fake_attachment(editable: false, deletable: false, id: 6)
     ]
     attachments = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['attachments']
-    assert_equal [true, false], attachments.map { |a| a['editable'] }
-    assert_equal [false, false], attachments.map { |a| a['deletable'] }
+    assert_equal([true, false], attachments.map { |a| a['editable'] })
+    assert_equal([false, false], attachments.map { |a| a['deletable'] })
   end
 
   def test_journal_carries_notes_editable_flag
