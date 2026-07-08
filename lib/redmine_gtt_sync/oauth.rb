@@ -106,10 +106,29 @@ module RedmineGttSync
       ad = {
         authorize_url: authorize_url(base_url),
         token_url: token_url(base_url),
-        scopes: SCOPES
+        scopes: advertised_scopes(client_id)
       }
       ad[:client_id] = client_id if client_id.present?
       ad
+    end
+
+    # The scopes to advertise, i.e. what the client will request at authorize
+    # time. When a managed public app is advertised, advertise the scopes that
+    # app actually permits (intersected with the set QTask uses): the client
+    # then requests exactly what Doorkeeper will grant, so an authorize can
+    # never fail with invalid_scope (the failure mode when the app's allowlist
+    # and the requested scopes drift), and an admin who narrows the app's scopes
+    # simply gates the matching QTask features off - the app's allowlist is the
+    # source of truth. SCOPES order is preserved for a stable advertisement.
+    # Falls back to the full recommended set when no app is advertised (manual
+    # setup) or the client_id can't be resolved to a public app.
+    def advertised_scopes(client_id)
+      return SCOPES if client_id.blank?
+
+      app = Doorkeeper::Application.where(confidential: false).find_by(uid: client_id)
+      return SCOPES unless app
+
+      SCOPES & app.scopes.to_a.map(&:to_s)
     end
   end
 end

@@ -11,6 +11,50 @@ class RedmineGttSyncOAuthTest < ActiveSupport::TestCase
     assert_not RedmineGttSync::OAuth.advertisement(base, client_id: '').key?(:client_id)
   end
 
+  def test_advertisement_falls_back_to_full_scopes_without_a_resolvable_app
+    base = 'https://demo.example.org'
+    # No app advertised, and a client_id that resolves to no public app, both
+    # advertise the full recommended set (manual-setup fallback).
+    assert_equal(RedmineGttSync::OAuth::SCOPES,
+                 RedmineGttSync::OAuth.advertisement(base)[:scopes])
+    assert_equal(RedmineGttSync::OAuth::SCOPES,
+                 RedmineGttSync::OAuth.advertisement(base, client_id: 'nope')[:scopes])
+  end
+
+  def test_advertisement_uses_the_apps_own_scopes_when_advertised
+    # The app's allowlist is the source of truth: advertise the intersection of
+    # what QTask uses and what the app permits, so the client requests exactly
+    # what Doorkeeper will grant (no invalid_scope), and a narrowed app just
+    # drops the corresponding scopes.
+    narrowed = RedmineGttSync::OAuth::SCOPES - %w[delete_issues edit_own_issue_notes]
+    app = Doorkeeper::Application.create!(
+      name: 'QTask narrowed', redirect_uri: 'http://127.0.0.1:7070/',
+      scopes: narrowed.join(' '), confidential: false
+    )
+    advertised = RedmineGttSync::OAuth.advertisement(
+      'https://demo.example.org', client_id: app.uid
+    )[:scopes]
+    assert_equal narrowed, advertised
+    assert_not_includes advertised, 'delete_issues'
+    # Advertised scopes never exceed what the app permits.
+    assert_empty(advertised - app.scopes.to_a.map(&:to_s))
+  end
+
+  def test_advertisement_ignores_app_scopes_outside_the_qtask_set
+    # An admin expanding the app with unrelated scopes doesn't bloat the request:
+    # only scopes QTask actually uses are advertised.
+    app = Doorkeeper::Application.create!(
+      name: 'QTask expanded', redirect_uri: 'http://127.0.0.1:7070/',
+      scopes: (RedmineGttSync::OAuth::SCOPES + %w[view_calendar]).join(' '),
+      confidential: false
+    )
+    advertised = RedmineGttSync::OAuth.advertisement(
+      'https://demo.example.org', client_id: app.uid
+    )[:scopes]
+    assert_equal RedmineGttSync::OAuth::SCOPES, advertised
+    assert_not_includes advertised, 'view_calendar'
+  end
+
   def test_qgis_oauth2_config_persists_token_and_uses_pkce
     cfg = RedmineGttSync::OAuth.qgis_oauth2_config('https://demo.example.org', 'cid')
     # Persist across restarts (matches QTask's default) so an imported config
