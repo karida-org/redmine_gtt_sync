@@ -50,7 +50,7 @@ class GttSyncController < ApplicationController
     else
       issues = project.issues.visible.to_a
     end
-    preload_issue_custom_values(issues)
+    preload_issue_associations(issues)
     render json: RedmineGttSync::ProjectBundle.build(
       project, issues, base_url: canonical_base_url
     )
@@ -76,16 +76,19 @@ class GttSyncController < ApplicationController
   # load (the "All projects, no query" scope). Cross-project by nature, so it is
   # gated per project rather than on a single one.
   def query_bundle
-    all_issues = if params[:query_id].present?
-                   IssueQuery.visible.find(params[:query_id]).issues
-                 else
-                   Issue.visible.to_a
-                 end
-    # Both query.issues and Issue.visible are view_issues-scoped; layer
-    # use_gtt_sync per project (a project-scoped permission) so only issues from
-    # projects the user may integrate with are returned.
-    issues = filter_issues_by_gtt_sync(all_issues)
-    preload_issue_custom_values(issues)
+    if params[:query_id].present?
+      # A saved query runs across all projects it spans; gate the resulting
+      # (already-materialized) array by use_gtt_sync in Ruby.
+      issues = filter_issues_by_gtt_sync(
+        IssueQuery.visible.find(params[:query_id]).issues
+      )
+    else
+      # All projects, no query: push the use_gtt_sync gate into the DB - only
+      # issues from projects the user may integrate with - rather than loading
+      # every visible issue instance-wide and filtering in Ruby.
+      issues = Issue.visible.where(project_id: gtt_sync_project_ids).to_a
+    end
+    preload_issue_associations(issues)
     render json: RedmineGttSync::QueryBundle.build(issues, base_url: canonical_base_url)
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Query not found' }, status: :not_found
@@ -93,24 +96,28 @@ class GttSyncController < ApplicationController
 
   private
 
-  # Keep to issues in projects where the current user holds use_gtt_sync
-  # (project-scoped), checking each distinct project once. Used by the
-  # cross-project / all-projects bundle where there is no single gate project.
-  def filter_issues_by_gtt_sync(issues)
-    projects = issues.map(&:project).uniq
-    allowed_ids = projects
-                  .select { |project| User.current.allowed_to?(:use_gtt_sync, project) }
-                  .map(&:id)
-                  .to_set
-    issues.select { |issue| allowed_ids.include?(issue.project_id) }
+  # Ids of projects where the current user may use the integration
+  # (use_gtt_sync is project-scoped, and Project.allowed_to already factors in
+  # module enablement + role, so even an admin only gets module-enabled ones).
+  def gtt_sync_project_ids
+    @gtt_sync_project_ids ||= Project.allowed_to(User.current, :use_gtt_sync).ids
   end
 
-  # Preload the custom-value associations the bundle serializes, so a large
-  # result doesn't fan out into an N+1 of per-issue custom-value/field queries.
-  # Takes an array (query.issues / *.to_a), so a relation preload won't do.
-  def preload_issue_custom_values(issues)
+  # Keep to issues in gtt_sync-enabled projects, matching on project_id (no
+  # per-issue project load). For the cross-project saved-query case, where the
+  # issue set is already an in-memory array.
+  def filter_issues_by_gtt_sync(issues)
+    allowed = gtt_sync_project_ids.to_set
+    issues.select { |issue| allowed.include?(issue.project_id) }
+  end
+
+  # Preload the associations the bundle serializes (custom values per issue and
+  # each issue's project, which the builders read for the project directory), so
+  # a large result doesn't fan out into per-issue N+1 queries. Takes an array
+  # (query.issues / *.to_a), so a relation preload won't do.
+  def preload_issue_associations(issues)
     ActiveRecord::Associations::Preloader.new(
-      records: issues, associations: { custom_values: :custom_field }
+      records: issues, associations: [:project, { custom_values: :custom_field }]
     ).call
   end
 
