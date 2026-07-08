@@ -29,4 +29,25 @@
                 method: :post, class: 'icon icon-add' %>
     <em class="info"><%= l(:text_gtt_sync_create_oauth_application_hint) %></em>
   </p>
+  <%
+    # The selected app's allowlist is the source of truth for what QTask may
+    # request: show which of QTask's scopes it grants so an admin sees the effect
+    # of narrowing/expanding it (features gate off when a scope isn't granted).
+    # The Create/reconcile button above restores the full recommended set.
+    selected_app = public_apps.detect { |app| app.uid == selected } if selected.present?
+  %>
+  <% if selected_app %>
+    <% status = RedmineGttSync::OAuth.scope_status(selected_app.uid) %>
+    <p>
+      <label><%= l(:label_gtt_sync_oauth_scope_status) %></label>
+      <span><%= l(:text_gtt_sync_oauth_scopes_granted,
+                  count: status[:granted].size,
+                  total: RedmineGttSync::OAuth::SCOPES.size) %></span>
+      <% if status[:ungranted].any? %>
+        <br />
+        <em class="info"><%= l(:text_gtt_sync_oauth_scopes_ungranted,
+                               scopes: status[:ungranted].join(', ')) %></em>
+      <% end %>
+    </p>
+  <% end %>
 </div>

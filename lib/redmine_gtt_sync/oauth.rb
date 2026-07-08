@@ -80,7 +80,10 @@ module RedmineGttSync
         redirectPort: 7070,
         clientId: client_id,
         clientSecret: nil,
-        scope: SCOPES.join(' '),
+        # Effective scopes for this app, not the raw SCOPES: a downloaded config
+        # must request only what the app grants, or importing it hits the same
+        # invalid_scope error when an admin has narrowed the app.
+        scope: advertised_scopes(client_id).join(' '),
         # Persist the token in QGIS's auth database so an imported connection
         # stays signed in across restarts (matches QTask's built-in default);
         # otherwise the token is session-only and re-authorizes every launch.
@@ -106,10 +109,37 @@ module RedmineGttSync
       ad = {
         authorize_url: authorize_url(base_url),
         token_url: token_url(base_url),
-        scopes: SCOPES
+        scopes: advertised_scopes(client_id)
       }
       ad[:client_id] = client_id if client_id.present?
       ad
+    end
+
+    # Split the QTask scope set against a managed app's allowlist:
+    # { granted: SCOPES the app permits, ungranted: SCOPES it doesn't }.
+    # Single source for both the advertised scopes and the settings-page status,
+    # so they can't drift. When a managed public app is advertised, `granted`
+    # is `SCOPES & app.scopes` (order preserved); the client then requests
+    # exactly what Doorkeeper will grant, so an authorize can never fail with
+    # invalid_scope (the failure mode when the app's allowlist and the requested
+    # scopes drift), and an admin who narrows the app's scopes simply gates the
+    # matching QTask features off - the app's allowlist is the source of truth.
+    # Falls back to the full recommended set (all granted) when no app is
+    # advertised (manual setup) or the client_id can't be resolved.
+    def scope_status(client_id)
+      return { granted: SCOPES, ungranted: [] } if client_id.blank?
+
+      app = Doorkeeper::Application.where(confidential: false).find_by(uid: client_id)
+      return { granted: SCOPES, ungranted: [] } unless app
+
+      permitted = app.scopes.to_a.map(&:to_s)
+      { granted: SCOPES & permitted, ungranted: SCOPES - permitted }
+    end
+
+    # The scopes to advertise, i.e. what the client will request at authorize
+    # time = the scopes the advertised app actually grants.
+    def advertised_scopes(client_id)
+      scope_status(client_id)[:granted]
     end
   end
 end

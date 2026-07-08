@@ -11,7 +11,9 @@ class GttSyncConnectController < ApplicationController
   def show
     @base_url = canonical_base_url
     @client_id = RedmineGttSync::Capabilities.advertised_oauth_client_id
-    @scopes = RedmineGttSync::OAuth::SCOPES
+    # Show the effective scopes for the advertised app (what QTask will request),
+    # not the raw recommended set, so the page matches a narrowed app.
+    @scopes = RedmineGttSync::OAuth.advertised_scopes(@client_id)
   end
 
   # Downloadable QGIS OAuth2 config the user imports via QGIS's auth import
