@@ -55,6 +55,34 @@ class RedmineGttSyncOAuthTest < ActiveSupport::TestCase
     assert_not_includes advertised, 'view_calendar'
   end
 
+  def test_scope_status_splits_granted_and_ungranted_against_the_app
+    narrowed = RedmineGttSync::OAuth::SCOPES - %w[delete_issues]
+    app = Doorkeeper::Application.create!(
+      name: 'QTask status', redirect_uri: 'http://127.0.0.1:7070/',
+      scopes: narrowed.join(' '), confidential: false
+    )
+    status = RedmineGttSync::OAuth.scope_status(app.uid)
+    assert_equal narrowed, status[:granted]
+    assert_equal %w[delete_issues], status[:ungranted]
+    # No app -> everything granted, nothing ungranted.
+    none = RedmineGttSync::OAuth.scope_status(nil)
+    assert_equal RedmineGttSync::OAuth::SCOPES, none[:granted]
+    assert_empty none[:ungranted]
+  end
+
+  def test_qgis_oauth2_config_scopes_follow_the_app
+    narrowed = RedmineGttSync::OAuth::SCOPES - %w[delete_issues]
+    app = Doorkeeper::Application.create!(
+      name: 'QTask cfg', redirect_uri: 'http://127.0.0.1:7070/',
+      scopes: narrowed.join(' '), confidential: false
+    )
+    cfg = RedmineGttSync::OAuth.qgis_oauth2_config('https://demo.example.org', app.uid)
+    # The downloadable config must request only what the app grants, or importing
+    # it hits invalid_scope for a narrowed app.
+    assert_equal narrowed.join(' '), cfg[:scope]
+    assert_not_includes cfg[:scope].split, 'delete_issues'
+  end
+
   def test_qgis_oauth2_config_persists_token_and_uses_pkce
     cfg = RedmineGttSync::OAuth.qgis_oauth2_config('https://demo.example.org', 'cid')
     # Persist across restarts (matches QTask's default) so an imported config

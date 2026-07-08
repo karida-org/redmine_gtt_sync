@@ -37,19 +37,16 @@
     selected_app = public_apps.detect { |app| app.uid == selected } if selected.present?
   %>
   <% if selected_app %>
-    <%
-      permitted = selected_app.scopes.to_a.map(&:to_s)
-      wanted = RedmineGttSync::OAuth::SCOPES
-      ungranted = wanted - permitted
-    %>
+    <% status = RedmineGttSync::OAuth.scope_status(selected_app.uid) %>
     <p>
       <label><%= l(:label_gtt_sync_oauth_scope_status) %></label>
       <span><%= l(:text_gtt_sync_oauth_scopes_granted,
-                  count: (wanted & permitted).size, total: wanted.size) %></span>
-      <% if ungranted.any? %>
+                  count: status[:granted].size,
+                  total: RedmineGttSync::OAuth::SCOPES.size) %></span>
+      <% if status[:ungranted].any? %>
         <br />
         <em class="info"><%= l(:text_gtt_sync_oauth_scopes_ungranted,
-                               scopes: ungranted.join(', ')) %></em>
+                               scopes: status[:ungranted].join(', ')) %></em>
       <% end %>
     </p>
   <% end %>
