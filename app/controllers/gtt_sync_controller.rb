@@ -111,13 +111,18 @@ class GttSyncController < ApplicationController
     issues.select { |issue| allowed.include?(issue.project_id) }
   end
 
-  # Preload the associations the bundle serializes (custom values per issue and
-  # each issue's project, which the builders read for the project directory), so
-  # a large result doesn't fan out into per-issue N+1 queries. Takes an array
-  # (query.issues / *.to_a), so a relation preload won't do.
+  # Preload the associations the bundle serializes (custom values per issue,
+  # each issue's project for the project directory, and the reference fields the
+  # summary renders as names), so a large result doesn't fan out into per-issue
+  # N+1 queries. Takes an array (query.issues / *.to_a), so a relation preload
+  # won't do.
   def preload_issue_associations(issues)
     ActiveRecord::Associations::Preloader.new(
-      records: issues, associations: [:project, { custom_values: :custom_field }]
+      records: issues,
+      associations: [
+        :project, :priority, :assigned_to, :category, :fixed_version,
+        { custom_values: :custom_field }
+      ]
     ).call
   end
 
