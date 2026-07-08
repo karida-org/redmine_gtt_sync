@@ -151,6 +151,32 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     assert_equal false, doc['editable']['can_add_notes']
   end
 
+  # A lightweight stand-in for a visible attachment.
+  def fake_attachment(editable:, deletable:, id: 1)
+    attachment = OpenStruct.new(
+      id: id, filename: 'photo.jpg', filesize: 2048,
+      content_type: 'image/jpeg', description: nil,
+      author: OpenStruct.new(id: 7, name: 'Dev'),
+      created_on: Time.utc(2026, 7, 2, 10, 0, 0)
+    )
+    attachment.stubs(:visible?).returns(true)
+    attachment.stubs(:image?).returns(true)
+    attachment.stubs(:editable?).returns(editable)
+    attachment.stubs(:deletable?).returns(deletable)
+    attachment
+  end
+
+  def test_attachment_carries_editable_and_deletable_flags
+    issue = fake_issue
+    issue.attachments = [
+      fake_attachment(editable: true, deletable: false, id: 5),
+      fake_attachment(editable: false, deletable: false, id: 6)
+    ]
+    attachments = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['attachments']
+    assert_equal([true, false], attachments.map { |a| a['editable'] })
+    assert_equal([false, false], attachments.map { |a| a['deletable'] })
+  end
+
   def test_journal_carries_notes_editable_flag
     issue = fake_issue
     issue.journals = [
