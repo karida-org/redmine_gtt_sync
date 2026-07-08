@@ -322,7 +322,13 @@ module RedmineGttSync
           'created_on' => attachment.created_on&.iso8601,
           'is_image' => image,
           'url' => "#{base}/attachments/download/#{attachment.id}/#{name}",
-          'thumbnail_url' => (image ? "#{base}/attachments/thumbnail/#{attachment.id}" : nil)
+          'thumbnail_url' => (image ? "#{base}/attachments/thumbnail/#{attachment.id}" : nil),
+          # Per-attachment action permissions for this user, delegated to
+          # Redmine (editable?/deletable? ride on the issue's edit permission),
+          # so the client offers Edit/Delete only when allowed. Coerced to a
+          # strict bool so a false is advertised explicitly, not dropped.
+          'editable' => !!attachment.editable?(user),
+          'deletable' => !!attachment.deletable?(user)
         }.compact
       end
     end
