@@ -32,6 +32,9 @@ class GttSyncConnectControllerTest < ActionController::TestCase
     assert_select 'button.gtt-copy', 0
     assert_select 'table.list', 0
     assert_select 'a[href=?]', plugin_settings_path(id: 'redmine_gtt_sync')
+    # The QGIS-config download and setup instructions are premature too.
+    assert_select 'a[href=?]', gtt_sync_connect_qgis_config_path, count: 0
+    assert_select 'p.info', 0
   end
 
   test 'no client_id: a non-admin is told to ask an administrator' do
@@ -45,6 +48,9 @@ class GttSyncConnectControllerTest < ActionController::TestCase
     assert_select 'table.list', 0
     assert_select 'a[href=?]', plugin_settings_path(id: 'redmine_gtt_sync'), count: 0
     assert_select 'p.warning'
+    # Same for a non-admin: no download link and no setup instructions.
+    assert_select 'a[href=?]', gtt_sync_connect_qgis_config_path, count: 0
+    assert_select 'p.info', 0
   end
 
   test 'shows a copy button for the client id when one is advertised' do
@@ -59,6 +65,9 @@ class GttSyncConnectControllerTest < ActionController::TestCase
     assert_select 'th', text: 'OAuth Client ID'
     assert_select 'button.gtt-copy', 3
     assert_select 'code.gtt-copy-value', text: app.uid
+    # With a client_id the download link and setup instructions are offered.
+    assert_select 'a[href=?]', gtt_sync_connect_qgis_config_path
+    assert_select 'p.info'
   end
 
   test 'qgis_config downloads the config when a client_id is advertised' do
