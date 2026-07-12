@@ -3,10 +3,28 @@
   # not a secret and is safe to advertise; a confidential client's id must not be.
   public_apps = Doorkeeper::Application.where(confidential: false).order(:name)
   selected = @settings['oauth_application_uid']
+  # The selected app (if any) is the source of truth for whether the connection
+  # is on and what QTask may do; computed once and reused for the status line and
+  # the scope breakdown below.
+  selected_app = public_apps.detect { |app| app.uid == selected } if selected.present?
 %>
+
+<%# Plain-language orientation before the form, so a non-technical admin knows
+    what this page is for. Full width (outside the .tabular label/field grid). %>
+<p><%= l(:text_gtt_sync_oauth_intro) %></p>
+
 <%# No `box` wrapper: Redmine already renders the settings container, so an
     inner box draws a second border. `tabular` keeps the label/field alignment. %>
 <div class="tabular">
+  <p>
+    <label><%= l(:label_gtt_sync_oauth_status) %></label>
+    <% if selected_app %>
+      <span class="icon icon-ok"><%= l(:text_gtt_sync_oauth_status_ready) %></span>
+    <% else %>
+      <span class="icon icon-warning"><%= l(:text_gtt_sync_oauth_status_off) %></span>
+    <% end %>
+  </p>
+
   <p>
     <label for="settings_oauth_application_uid"><%= l(:label_gtt_sync_oauth_application) %></label>
     <%= select_tag 'settings[oauth_application_uid]',
@@ -31,10 +49,9 @@
   </p>
   <%
     # The selected app's allowlist is the source of truth for what QTask may
-    # request: show which of QTask's scopes it grants so an admin sees the effect
-    # of narrowing/expanding it (features gate off when a scope isn't granted).
-    # The Create/reconcile button above restores the full recommended set.
-    selected_app = public_apps.detect { |app| app.uid == selected } if selected.present?
+    # do: show which of QTask's actions it allows so an admin sees the effect of
+    # narrowing/expanding it (features gate off when a permission isn't allowed).
+    # The Set-up/reconcile button above restores the full recommended set.
   %>
   <% if selected_app %>
     <% status = RedmineGttSync::OAuth.scope_status(selected_app.uid) %>
