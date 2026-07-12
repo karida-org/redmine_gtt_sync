@@ -16,8 +16,11 @@
     rule pins each row label to the top, so it lines up with the first line of a
     tall, multi-line field instead of floating against its middle. %>
 <style>
-  .plugin-redmine_gtt_sync .gtt-sync-intro { margin: 0 0 1.2em; max-width: 60em; }
-  .plugin-redmine_gtt_sync .tabular > p > label { padding-top: 0; }
+  .plugin-redmine_gtt_sync .gtt-sync-intro { margin: 0 0 1.2em; }
+  /* Redmine's `#content .tabular label` rule adds a top margin to centre the
+     label against input boxes; its ID scope outranks a class selector, so match
+     that scope here to reset it and top-align each label with its field. */
+  #content .plugin-redmine_gtt_sync .tabular > p > label { margin-top: 0; }
 </style>
 
 <div class="gtt-sync-intro"><%= l(:text_gtt_sync_oauth_intro) %></div>
