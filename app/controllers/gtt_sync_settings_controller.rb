@@ -11,7 +11,7 @@ class GttSyncSettingsController < ApplicationController
     Setting.plugin_redmine_gtt_sync = Setting.plugin_redmine_gtt_sync.merge(
       'oauth_application_uid' => app.uid
     )
-    flash[:notice] = l(:notice_gtt_sync_oauth_application_created, name: app.name)
+    flash[:notice] = l(:notice_gtt_sync_oauth_application_created)
   rescue StandardError => e
     flash[:error] = l(:error_gtt_sync_oauth_application_failed, message: e.message)
   ensure
