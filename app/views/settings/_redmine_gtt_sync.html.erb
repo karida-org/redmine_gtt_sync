@@ -9,62 +9,70 @@
   selected_app = public_apps.detect { |app| app.uid == selected } if selected.present?
 %>
 
-<%# Plain-language orientation before the form, so a non-technical admin knows
-    what this page is for. Full width (outside the .tabular label/field grid). %>
-<p><%= l(:text_gtt_sync_oauth_intro) %></p>
+<%# Redmine renders this partial inside its own `.box.tabular` wrapper, which
+    lays each <p> out as a right-aligned label column plus a field column. So we
+    do NOT add another `.tabular` (that would nest the grid), and the intro is a
+    <div> (not a <p>) to stay out of the grid and read full width. The scoped
+    rule pins each row label to the top, so it lines up with the first line of a
+    tall, multi-line field instead of floating against its middle. %>
+<style>
+  .plugin-redmine_gtt_sync .gtt-sync-intro { margin: 0 0 1.2em; max-width: 60em; }
+  .plugin-redmine_gtt_sync .tabular > p > label { padding-top: 0; }
+</style>
 
-<%# No `box` wrapper: Redmine already renders the settings container, so an
-    inner box draws a second border. `tabular` keeps the label/field alignment. %>
-<div class="tabular">
+<div class="gtt-sync-intro"><%= l(:text_gtt_sync_oauth_intro) %></div>
+
+<p>
+  <label><%= l(:label_gtt_sync_oauth_status) %></label>
+  <% if selected_app %>
+    <span class="icon icon-ok"><%= l(:text_gtt_sync_oauth_status_ready) %></span>
+  <% else %>
+    <span class="icon icon-warning"><%= l(:text_gtt_sync_oauth_status_off) %></span>
+  <% end %>
+</p>
+
+<p>
+  <label for="settings_oauth_application_uid"><%= l(:label_gtt_sync_oauth_application) %></label>
+  <%= select_tag 'settings[oauth_application_uid]',
+        options_for_select(
+          [[l(:label_gtt_sync_oauth_application_none), '']] +
+            public_apps.map { |app| [app.name, app.uid] },
+          selected
+        ),
+        id: 'settings_oauth_application_uid' %>
+  <em class="info"><%= l(:text_gtt_sync_oauth_application_hint) %></em>
+</p>
+
+<% if public_apps.empty? %>
+  <p><em class="info"><%= l(:text_gtt_sync_oauth_no_public_apps) %></em></p>
+<% end %>
+
+<p>
+  <%# An <a> (not a nested form) so it is valid inside the settings form; UJS
+      turns method: :post into a CSRF-protected POST. %>
+  <%= link_to l(:button_gtt_sync_create_oauth_application),
+              gtt_sync_create_oauth_application_path,
+              method: :post, class: 'icon icon-add' %>
+  <em class="info"><%= l(:text_gtt_sync_create_oauth_application_hint) %></em>
+</p>
+
+<%
+  # The selected app's allowlist is the source of truth for what QTask may do:
+  # show which of QTask's actions it allows so an admin sees the effect of
+  # narrowing/expanding it (features gate off when a permission isn't allowed).
+  # The Set-up/reconcile button above restores the full recommended set.
+%>
+<% if selected_app %>
+  <% status = RedmineGttSync::OAuth.scope_status(selected_app.uid) %>
   <p>
-    <label><%= l(:label_gtt_sync_oauth_status) %></label>
-    <% if selected_app %>
-      <span class="icon icon-ok"><%= l(:text_gtt_sync_oauth_status_ready) %></span>
-    <% else %>
-      <span class="icon icon-warning"><%= l(:text_gtt_sync_oauth_status_off) %></span>
+    <label><%= l(:label_gtt_sync_oauth_scope_status) %></label>
+    <span><%= l(:text_gtt_sync_oauth_scopes_granted,
+                count: status[:granted].size,
+                total: RedmineGttSync::OAuth::SCOPES.size) %></span>
+    <% if status[:ungranted].any? %>
+      <br />
+      <em class="info"><%= l(:text_gtt_sync_oauth_scopes_ungranted,
+                             scopes: status[:ungranted].join(', ')) %></em>
     <% end %>
   </p>
-
-  <p>
-    <label for="settings_oauth_application_uid"><%= l(:label_gtt_sync_oauth_application) %></label>
-    <%= select_tag 'settings[oauth_application_uid]',
-          options_for_select(
-            [[l(:label_gtt_sync_oauth_application_none), '']] +
-              public_apps.map { |app| [app.name, app.uid] },
-            selected
-          ),
-          id: 'settings_oauth_application_uid' %>
-    <em class="info"><%= l(:text_gtt_sync_oauth_application_hint) %></em>
-  </p>
-  <% if public_apps.empty? %>
-    <p><em class="info"><%= l(:text_gtt_sync_oauth_no_public_apps) %></em></p>
-  <% end %>
-  <p>
-    <%# An <a> (not a nested form) so it is valid inside the settings form; UJS
-        turns method: :post into a CSRF-protected POST. %>
-    <%= link_to l(:button_gtt_sync_create_oauth_application),
-                gtt_sync_create_oauth_application_path,
-                method: :post, class: 'icon icon-add' %>
-    <em class="info"><%= l(:text_gtt_sync_create_oauth_application_hint) %></em>
-  </p>
-  <%
-    # The selected app's allowlist is the source of truth for what QTask may
-    # do: show which of QTask's actions it allows so an admin sees the effect of
-    # narrowing/expanding it (features gate off when a permission isn't allowed).
-    # The Set-up/reconcile button above restores the full recommended set.
-  %>
-  <% if selected_app %>
-    <% status = RedmineGttSync::OAuth.scope_status(selected_app.uid) %>
-    <p>
-      <label><%= l(:label_gtt_sync_oauth_scope_status) %></label>
-      <span><%= l(:text_gtt_sync_oauth_scopes_granted,
-                  count: status[:granted].size,
-                  total: RedmineGttSync::OAuth::SCOPES.size) %></span>
-      <% if status[:ungranted].any? %>
-        <br />
-        <em class="info"><%= l(:text_gtt_sync_oauth_scopes_ungranted,
-                               scopes: status[:ungranted].join(', ')) %></em>
-      <% end %>
-    </p>
-  <% end %>
-</div>
+<% end %>

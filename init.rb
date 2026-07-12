@@ -13,11 +13,11 @@ require_relative 'lib/redmine_gtt_sync/project_schema'
 # It builds on redmine_gtt and never duplicates its geometry storage or base API.
 Redmine::Plugin.register :redmine_gtt_sync do
   name 'Redmine GTT Sync'
-  author 'Karida G.K.'
+  author 'Karida'
   description 'Sync/integration contract for GTT geometry: QGIS (QTask), QField, and OGC clients.'
-  version '0.1.0'
+  version '0.2.0'
   url 'https://github.com/karida-org/redmine_gtt_sync'
-  author_url 'https://karida.info'
+  author_url 'https://karida.jp'
 
   requires_redmine version_or_higher: '6.1.0'
   requires_redmine_plugin :redmine_gtt, version_or_higher: '0.0.1'
