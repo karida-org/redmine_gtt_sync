@@ -22,17 +22,29 @@ class GttSyncConnectControllerTest < ActionController::TestCase
     assert_response :forbidden
   end
 
-  test 'shows connection details to a user with gtt_sync access' do
+  test 'no client_id: an admin sees the settings link and no details table' do
     @request.session[:user_id] = 1 # admin passes the permission gate
     get :show
     assert_response :success
     assert_select 'h2', 'Connect QGIS'
-    # The click-to-copy wiring must render: the page script plus a Copy button
-    # per value. With no client_id advertised the client-id row is omitted, so
-    # only URL + Scopes carry a button.
-    assert_select 'script[src*=?]', 'gtt_sync_connect'
-    assert_select 'button.gtt-copy', 2
-    assert_select 'th', text: 'OAuth Client ID', count: 0
+    # Nothing to connect with yet, so the details table and its Copy buttons are
+    # withheld; the admin gets an actionable link to the plugin settings instead.
+    assert_select 'button.gtt-copy', 0
+    assert_select 'table.list', 0
+    assert_select 'a[href=?]', plugin_settings_path(id: 'redmine_gtt_sync')
+  end
+
+  test 'no client_id: a non-admin is told to ask an administrator' do
+    # jsmith is a member of project 1 via role 1; grant that role use_gtt_sync so
+    # he clears the access gate but is still a non-admin viewer.
+    Role.find(1).add_permission!(:use_gtt_sync)
+    @request.session[:user_id] = 2
+    get :show
+    assert_response :success
+    # No details table, no settings link, and no admin-only actionable copy.
+    assert_select 'table.list', 0
+    assert_select 'a[href=?]', plugin_settings_path(id: 'redmine_gtt_sync'), count: 0
+    assert_select 'p.warning'
   end
 
   test 'shows a copy button for the client id when one is advertised' do
@@ -41,7 +53,9 @@ class GttSyncConnectControllerTest < ActionController::TestCase
     @request.session[:user_id] = 1
     get :show
     assert_response :success
-    # Client-id row now present: URL + Client ID + Scopes = three Copy buttons.
+    # The click-to-copy wiring must render: the page script plus a Copy button
+    # per value. Client-id row now present: URL + Client ID + Scopes = three.
+    assert_select 'script[src*=?]', 'gtt_sync_connect'
     assert_select 'th', text: 'OAuth Client ID'
     assert_select 'button.gtt-copy', 3
     assert_select 'code.gtt-copy-value', text: app.uid

@@ -26,35 +26,46 @@
 
 <h2><%= l(:label_gtt_sync_connect) %></h2>
 
-<p><%= l(:text_gtt_sync_connect_intro) %></p>
+<% if @client_id.present? %>
+  <%# Full connection details: only meaningful once an OAuth app is published. %>
+  <p><%= l(:text_gtt_sync_connect_intro) %></p>
 
-<table class="list">
-  <tbody>
-    <tr>
-      <th><%= l(:label_gtt_sync_connect_url) %></th>
-      <%= copy_cell.call(@base_url, l(:label_gtt_sync_connect_url)) %>
-    </tr>
-    <% if @client_id.present? %>
+  <table class="list">
+    <tbody>
+      <tr>
+        <th><%= l(:label_gtt_sync_connect_url) %></th>
+        <%= copy_cell.call(@base_url, l(:label_gtt_sync_connect_url)) %>
+      </tr>
       <tr>
         <th><%= l(:label_gtt_sync_connect_client_id) %></th>
         <%= copy_cell.call(@client_id, l(:label_gtt_sync_connect_client_id)) %>
       </tr>
-    <% end %>
-    <tr>
-      <th><%= l(:label_gtt_sync_connect_scopes) %></th>
-      <%= copy_cell.call(@scopes.join(' '), l(:label_gtt_sync_connect_scopes)) %>
-    </tr>
-  </tbody>
-</table>
+      <tr>
+        <th><%= l(:label_gtt_sync_connect_scopes) %></th>
+        <%= copy_cell.call(@scopes.join(' '), l(:label_gtt_sync_connect_scopes)) %>
+      </tr>
+    </tbody>
+  </table>
 
-<% if @client_id.present? %>
   <p>
     <%= link_to l(:button_gtt_sync_download_qgis_config),
                 gtt_sync_connect_qgis_config_path,
                 class: 'icon icon-download' %>
   </p>
-<% else %>
-  <p class="warning"><%= l(:text_gtt_sync_connect_no_client_id) %></p>
-<% end %>
 
-<p class="info"><%= l(:text_gtt_sync_connect_instructions) %></p>
+  <p class="info"><%= l(:text_gtt_sync_connect_instructions) %></p>
+<% else %>
+  <%# No client ID yet: withhold the URL/scopes/instructions so nobody tries to
+      set up a connection that cannot work, and instead point at the real fix.
+      An admin can act on it directly; anyone else is told who to ask. %>
+  <% if User.current.admin? %>
+    <p class="warning"><%= l(:text_gtt_sync_connect_no_client_id_admin) %></p>
+    <p>
+      <%= link_to l(:button_gtt_sync_configure_oauth_application),
+                  plugin_settings_path(id: 'redmine_gtt_sync'),
+                  class: 'icon icon-settings' %>
+    </p>
+  <% else %>
+    <p class="warning"><%= l(:text_gtt_sync_connect_no_client_id) %></p>
+  <% end %>
+<% end %>
