@@ -21,9 +21,8 @@ module RedmineGttSync
         'statuses' => IssueStatus.sorted.map do |s|
           { 'id' => s.id, 'name' => s.name, 'is_closed' => s.is_closed }
         end,
-        'custom_fields' => custom_fields(project, user),
-        'writable' => writable_fields(project, user)
-      }
+        'custom_fields' => custom_fields(project, user)
+      }.merge(writable_and_references(project, user))
     end
 
     def custom_fields(project, user)
@@ -52,15 +51,28 @@ module RedmineGttSync
       }
     end
 
-    # Core + custom attribute names a NEW issue exposes to this user; Redmine
-    # drops anything else via safe_attributes, so a client won't send fields that
-    # would be silently ignored (includes GTT's "geojson"). Per-status field
-    # permissions are per-issue and left to a later per-issue schema.
-    def writable_fields(project, user)
+    # Core + custom attribute names a NEW issue exposes to this user, plus the
+    # {id, name} option lists for the writable reference fields
+    # (assignee/priority/category/version). Both come from ONE stand-in Issue in
+    # this project's context: Redmine's own safe_attribute_names gives the
+    # writable set (so a client won't send fields safe_attributes would silently
+    # drop, including GTT's "geojson"), and the same issue resolves the reference
+    # option sets (assignable users/versions, project categories) with correct
+    # scoping. Empty when the project has no tracker (nothing can be created).
+    #
+    # The writable set + references use the project's FIRST tracker; per-tracker
+    # and per-status field permissions are per-issue and left to a later per-issue
+    # schema.
+    def writable_and_references(project, user)
       tracker = project.trackers.sorted.first
-      return [] unless tracker
+      return { 'writable' => [], 'references' => {} } unless tracker
 
-      Issue.new(project: project, tracker: tracker, author: user).safe_attribute_names(user)
+      issue = Issue.new(project: project, tracker: tracker, author: user)
+      writable = issue.safe_attribute_names(user)
+      {
+        'writable' => writable,
+        'references' => ReferenceOptions.for_issue(issue, writable)
+      }
     end
   end
 end

@@ -101,30 +101,8 @@ module RedmineGttSync
         'status_transitions' => issue.new_statuses_allowed_to(user).map do |status|
           { 'id' => status.id, 'name' => status.name }
         end,
-        'references' => reference_options(issue, writable)
+        'references' => ReferenceOptions.for_issue(issue, writable)
       }
-    end
-
-    # Allowed {id, name} options for the writable reference fields, so a client
-    # can offer real dropdowns for assignee / priority / category / version
-    # instead of a raw id. Only fields the user may write are included (gated by
-    # safe_attribute_names), and the option sets are delegated to Redmine so
-    # project scoping and visibility stay correct.
-    def reference_options(issue, writable)
-      # Lazy sources so a non-writable field's options are never queried.
-      sources = {
-        'assigned_to_id' => -> { issue.assignable_users },
-        'priority_id' => -> { IssuePriority.active },
-        'category_id' => -> { issue.project.issue_categories },
-        'fixed_version_id' => -> { issue.assignable_versions }
-      }
-      sources.each_with_object({}) do |(field, source), options|
-        options[field] = named(source.call) if writable.include?(field)
-      end
-    end
-
-    def named(records)
-      records.map { |record| { 'id' => record.id, 'name' => record.name } }
     end
 
     # Custom field values for this issue, with editing metadata (possible_values

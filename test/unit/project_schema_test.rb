@@ -50,4 +50,38 @@ class RedmineGttSyncProjectSchemaTest < ActiveSupport::TestCase
       hash['value_options']
     )
   end
+
+  def test_writable_and_references_from_first_tracker_stand_in
+    project = project_with_tracker(OpenStruct.new(id: 1, name: 'Task'))
+    issue = mock('issue')
+    issue.stubs(:safe_attribute_names).returns(%w[subject assigned_to_id])
+    issue.stubs(:assignable_users).returns([OpenStruct.new(id: 8, name: 'Worker')])
+    # The non-writable reference fields must not be queried at all.
+    issue.expects(:assignable_versions).never
+    Issue.stubs(:new).returns(issue)
+
+    result = RedmineGttSync::ProjectSchema.writable_and_references(project, OpenStruct.new)
+    assert_equal %w[subject assigned_to_id], result['writable']
+    assert_equal [{ 'id' => 8, 'name' => 'Worker' }],
+                 result['references']['assigned_to_id']
+    refute result['references'].key?('priority_id')
+  end
+
+  def test_writable_and_references_empty_without_tracker
+    result = RedmineGttSync::ProjectSchema.writable_and_references(
+      project_with_tracker(nil), OpenStruct.new
+    )
+    assert_equal [], result['writable']
+    assert_equal({}, result['references'])
+  end
+
+  private
+
+  # A stand-in project whose trackers.sorted.first is +tracker+ (or none when
+  # +tracker+ is nil).
+  def project_with_tracker(tracker)
+    trackers = mock('trackers')
+    trackers.stubs(:sorted).returns([tracker].compact)
+    OpenStruct.new(trackers: trackers)
+  end
 end
