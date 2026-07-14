@@ -19,7 +19,7 @@ module RedmineGttSync
     # URL) so the document is self-contained and needs no network to interpret.
     CONTEXT = {
       '@vocab' => 'https://schema.org/',
-      'gtt' => 'https://karida.info/ns/gtt#',
+      'gtt' => 'https://gtt-project.org/ns/gtt#',
       'geo' => 'http://www.opengis.net/ont/geosparql#',
       'geojson' => 'https://purl.org/geojson/vocab#',
       'geometry' => 'geojson:geometry',
