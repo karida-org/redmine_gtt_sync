@@ -16,7 +16,7 @@ Redmine::Plugin.register :redmine_gtt_sync do
   name 'Redmine GTT Sync'
   author 'Daniel Kastl'
   description 'Sync/integration contract for GTT geometry: QGIS (QTask), QField, and OGC clients.'
-  version '0.2.0'
+  version '0.3.0'
   url 'https://github.com/karida-org/redmine_gtt_sync'
   author_url 'https://github.com/karida-org/redmine_gtt_sync'
 
