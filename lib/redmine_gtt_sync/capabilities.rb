@@ -41,6 +41,11 @@ module RedmineGttSync
         capabilities: base_capabilities(gtt_present)
           .merge(contract_capabilities)
           .merge(behavior_capabilities),
+        # The instance's rich-text formatter. A client that renders Markdown
+        # itself (QTask) must know whether the instance actually authors in
+        # Markdown: on a Textile instance, client-side Markdown rendering would
+        # be wrong, so it can disable that UX. `markdown` is the convenience flag.
+        formatting: formatting_info,
         # OAuth2 setup parameters so a client can build its auth config without
         # the user knowing the scopes/endpoints. Public probe: scopes/endpoints
         # always, plus the client_id only when an admin selected a public app to
@@ -49,6 +54,16 @@ module RedmineGttSync
           canonical_base_url, client_id: advertised_oauth_client_id
         )
       }
+    end
+
+    # The rich-text formatter the instance authors in. Only common_mark and
+    # textile are registered on modern RedMica/Redmine (Redcarpet's `markdown`
+    # is gone), but treat a legacy `markdown` as Markdown-capable too. Anything
+    # else (e.g. textile, or a null formatter) reports markdown: false so a
+    # Markdown-rendering client turns that UX off rather than mis-rendering.
+    def formatting_info
+      fmt = Setting.text_formatting.to_s
+      { text_formatting: fmt, markdown: %w[common_mark markdown].include?(fmt) }
     end
 
     # The instance's canonical origin (Setting, not request host) so advertised

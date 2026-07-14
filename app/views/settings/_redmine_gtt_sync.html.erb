@@ -25,6 +25,13 @@
 
 <div class="gtt-sync-intro"><%= l(:text_gtt_sync_oauth_intro) %></div>
 
+<%# QTask renders Markdown itself; on a Textile instance that would be wrong, so
+    it disables the Markdown editor/preview there. Warn admins so the fix (switch
+    the instance to CommonMark) is discoverable. %>
+<% unless RedmineGttSync::Capabilities.formatting_info[:markdown] %>
+  <div class="warning gtt-sync-intro"><%= l(:text_gtt_sync_textile_warning) %></div>
+<% end %>
+
 <p>
   <label><%= l(:label_gtt_sync_oauth_status) %></label>
   <% if selected_app %>
