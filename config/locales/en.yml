@@ -1,6 +1,6 @@
 en:
   text_gtt_sync_oauth_intro: "This page turns on the connection between this site and QGIS, the desktop mapping app. Once it is set up, your team can open this site's issues as an editable map in QGIS using the QTask plugin, signing in with their normal account. Nobody has to copy any keys, passwords, or web addresses by hand."
-  text_gtt_sync_textile_warning: "This site is set to the Textile text format. QGIS/QTask formats issue descriptions and notes as Markdown, so it turns off its Markdown editor and preview here and shows the text as-is. For the best experience, set the text formatting to \"CommonMark Markdown (GitHub Flavored)\" under Administration > Settings > General."
+  text_gtt_sync_textile_warning: "This site is not set to a Markdown text format. QGIS/QTask formats issue descriptions and notes as Markdown, so it turns off its Markdown editor and preview and shows the text as-is. For the best experience, set the text formatting to \"CommonMark Markdown (GitHub Flavored)\" under Administration > Settings > General."
   label_gtt_sync_oauth_status: "Status"
   text_gtt_sync_oauth_status_ready: "On. People can connect from QGIS/QTask and sign in with their own account."
   text_gtt_sync_oauth_status_off: "Off. Nobody can connect from QGIS/QTask yet. Use the button below to set it up."
