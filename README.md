@@ -24,9 +24,6 @@ contract on top:
   offline resync, schema introspection (writable fields per user and status), and
   OGC API - Features / WFS-T endpoints.
 
-See the product spec (`specs/georeport-qgis-integration.md` in the operations
-workspace) for the full picture.
-
 ## Development
 
 Install this plugin alongside `redmine_gtt` under a Redmine checkout's `plugins/`
