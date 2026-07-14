@@ -63,6 +63,27 @@ class RedmineGttSyncCapabilitiesTest < ActiveSupport::TestCase
     assert_equal true, @report[:capabilities][:query_scoped_bundle]
   end
 
+  def test_reports_the_text_formatting_mode
+    # A Markdown-rendering client (QTask) reads this to decide whether to enable
+    # its Markdown editor/preview. Exercise formatting_info directly (both
+    # branches) rather than depending on the fixture's global Setting.
+    Setting.stubs(:text_formatting).returns('common_mark')
+    common = RedmineGttSync::Capabilities.formatting_info
+    assert_equal 'common_mark', common[:text_formatting]
+    assert_equal true, common[:markdown]
+
+    Setting.stubs(:text_formatting).returns('textile')
+    textile = RedmineGttSync::Capabilities.formatting_info
+    assert_equal 'textile', textile[:text_formatting]
+    assert_equal false, textile[:markdown]
+  end
+
+  def test_report_includes_the_formatting_block
+    assert @report.key?(:formatting)
+    assert_equal Setting.text_formatting.to_s, @report[:formatting][:text_formatting]
+    assert_includes [true, false], @report[:formatting][:markdown]
+  end
+
   def test_capabilities_probe_route_is_detected
     # Sanity-check the detection predicate against a route that does exist.
     assert RedmineGttSync::Capabilities.route_defined?(:gtt_sync_capabilities)
