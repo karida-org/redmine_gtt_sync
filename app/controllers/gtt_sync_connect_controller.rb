@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # User-facing "Connect QGIS" page: a discoverable, self-serve home for the
 # connection details a QGIS/QTask user needs, so setup isn't tribal knowledge.
 # The data isn't secret (a public PKCE client_id is not), but the page is only

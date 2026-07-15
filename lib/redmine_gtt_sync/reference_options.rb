@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module RedmineGttSync
   # Allowed {id, name} options for the writable reference fields (assignee,
   # priority, category, target version), so a client can offer real dropdowns

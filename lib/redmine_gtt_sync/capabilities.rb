@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module RedmineGttSync
   # Feature-detection payload for the capabilities probe (GET
   # /gtt_sync/capabilities). Flags reflect what the running build actually

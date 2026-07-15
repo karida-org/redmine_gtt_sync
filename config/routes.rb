@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Plugin routes are evaluated inside Redmine's routing context, so route
 # declarations are written directly (not wrapped in a draw block).
 

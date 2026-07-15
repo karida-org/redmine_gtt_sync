@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module RedmineGttSync
   # Shared shaping of an issue's custom-field VALUES, used by both the single
   # issue document and the bundle (so the detail panel and the whole loaded set

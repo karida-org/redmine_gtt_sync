@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module RedmineGttSync
   # Per-project editing schema for a client to build a correct, permission-aware
   # form: the applicable trackers, statuses, custom-field definitions, and the

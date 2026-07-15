@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require File.expand_path('../../test_helper', __FILE__)
 require 'ostruct'
 
@@ -55,6 +57,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     # (tests that check gating override these).
     issue.stubs(:deletable?).returns(true)
     issue.stubs(:notes_addable?).returns(true)
+    issue.stubs(:attachments_addable?).returns(true)
     # editable_custom_field_values(user) drives the per-field `writable` flag;
     # default to none editable (tests that check it override this).
     issue.stubs(:editable_custom_field_values).returns([])
@@ -149,6 +152,18 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')
     assert_equal false, doc['editable']['can_delete']
     assert_equal false, doc['editable']['can_add_notes']
+  end
+
+  def test_editable_contract_advertises_attachment_add_permission
+    # attachments_addable? (add_issue_notes OR edit_issues, Redmine's own attach
+    # rule) so a client can gate its upload button without proxying other flags.
+    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://x')
+    assert_equal true, doc['editable']['can_add_attachments']
+
+    issue = fake_issue
+    issue.stubs(:attachments_addable?).returns(false)
+    doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')
+    assert_equal false, doc['editable']['can_add_attachments']
   end
 
   # A lightweight stand-in for a visible attachment.
