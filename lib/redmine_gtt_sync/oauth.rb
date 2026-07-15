@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module RedmineGttSync
   # OAuth2 integration parameters advertised to clients (QTask for QGIS) via the
   # public capabilities probe, so a user setting up a connection never has to
@@ -42,8 +44,8 @@ module RedmineGttSync
 
     # The managed public client QTask uses: Authorization Code + PKCE, loopback
     # redirect on QGIS's default OAuth port, no client secret.
-    QTASK_APP_NAME = 'QTask'.freeze
-    QTASK_REDIRECT_URI = 'http://127.0.0.1:7070/'.freeze
+    QTASK_APP_NAME = 'QTask'
+    QTASK_REDIRECT_URI = 'http://127.0.0.1:7070/'
 
     module_function
 

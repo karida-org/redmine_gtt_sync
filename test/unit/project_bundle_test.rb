@@ -1,19 +1,33 @@
+# frozen_string_literal: true
+
 require File.expand_path('../../test_helper', __FILE__)
 require 'ostruct'
 
 class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
+  setup do
+    # summary() reads User.current for the per-feature editable flag; the fake
+    # issues stub attributes_editable? themselves, so any user object works.
+    User.stubs(:current).returns(stub)
+  end
+
   def factory
     @factory ||= RGeo::Cartesian.preferred_factory(srid: 4326)
   end
 
-  def issue(id, geom:, status_id: 1, tracker_id: 2, custom_field_values: [], **extra)
-    OpenStruct.new(
+  def issue(
+    id, geom:, status_id: 1, tracker_id: 2, custom_field_values: [],
+    attributes_editable: true, **extra
+  )
+    record = OpenStruct.new(
       {
         id: id, subject: "Issue #{id}", status_id: status_id,
         tracker_id: tracker_id, lock_version: 0, geom: geom,
         visible_custom_field_values: custom_field_values
       }.merge(extra)
     )
+    # Takes a user arg, so it can't be a plain OpenStruct reader.
+    record.stubs(:attributes_editable?).returns(attributes_editable)
+    record
   end
 
   # A named reference (priority/assignee/category/version) as the summary reads
@@ -101,6 +115,22 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
     assert_in_delta 3.5, props['estimated_hours']
     assert_equal '2026-06-01T08:00:00Z', props['created_on']
     assert_equal '2026-06-02T09:30:00Z', props['updated_on']
+  end
+
+  def test_summary_carries_per_feature_editable_flag
+    # attributes_editable? for the current user, persisted per feature (spatial
+    # AND unplaced) so a client can fail closed on map-side editing.
+    bundle = build(
+      [
+        issue(1, geom: factory.point(1.0, 2.0), attributes_editable: true),
+        issue(2, geom: factory.point(3.0, 4.0), attributes_editable: false),
+        issue(3, geom: nil, attributes_editable: false)
+      ]
+    )
+    features = bundle['issues']['point']['features']
+    assert_equal true, features[0]['properties']['editable']
+    assert_equal false, features[1]['properties']['editable']
+    assert_equal false, bundle['issues']['unplaced'][0]['editable']
   end
 
   def test_summary_leaves_unset_reference_and_date_fields_null

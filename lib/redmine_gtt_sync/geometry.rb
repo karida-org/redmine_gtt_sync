@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module RedmineGttSync
   # Geometry serialization for the contract: a GeoJSON geometry object and an
   # EWKT string (WKT with an SRID prefix) from an RGeo geometry. Both nil-safe,

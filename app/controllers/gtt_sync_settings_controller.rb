@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Admin-only actions behind the plugin settings screen. Kept separate from
 # GttSyncController (the public/authenticated integration contract) because this
 # manages server configuration, not the contract itself.

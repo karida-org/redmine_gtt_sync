@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Endpoints for the QGIS/QField/OGC integration contract.
 #
 # Exposes a public capabilities probe and a single-issue JSON-LD document.

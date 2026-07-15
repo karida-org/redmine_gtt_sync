@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module RedmineGttSync
   # Query-driven generalization of ProjectBundle: materialize the issues of any
   # saved Redmine query (project-scoped or global/cross-project) as one payload.

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'erb'
 
 module RedmineGttSync
@@ -98,6 +100,9 @@ module RedmineGttSync
         # notes_addable? -> :add_issue_notes, both role + per-tracker scoped.
         'can_delete' => issue.deletable?(user),
         'can_add_notes' => issue.notes_addable?(user),
+        # attachments_addable? -> add_issue_notes OR edit_issues (Redmine's own
+        # attach rule), so clients can gate an upload button without proxying.
+        'can_add_attachments' => issue.attachments_addable?(user),
         'status_transitions' => issue.new_statuses_allowed_to(user).map do |status|
           { 'id' => status.id, 'name' => status.name }
         end,
@@ -135,15 +140,25 @@ module RedmineGttSync
       }
     end
 
-    # Notes + change history, only the entries visible to the user (private notes
-    # and role-restricted detail changes are filtered by Redmine).
+    # Notes + change history, only the entries visible to the user. NOTE:
+    # Journal#visible? only re-checks the ISSUE's visibility - it does NOT
+    # filter private notes (core filters those separately, see
+    # Issue#visible_journals_with_index). Mirror that rule here: a private note
+    # is included only for users with view_private_notes or its own author.
+    # Role-restricted detail changes are filtered per journal (visible_details).
     def journals(base, issue, user)
+      entries = issue.journals.select { |journal| journal.visible?(user) }
+      unless user.allowed_to?(:view_private_notes, issue.project)
+        entries = entries.reject do |journal|
+          journal.private_notes? && journal.user != user
+        end
+      end
       # One label cache per document build: reference changes repeat the same
       # few records across a history (a handful of statuses, assignees, ...), so
       # memoizing by [association, id] collapses the per-detail lookups instead
       # of hitting the DB twice for every detail.
       label_cache = {}
-      issue.journals.select { |journal| journal.visible?(user) }.map do |journal|
+      entries.map do |journal|
         {
           'id' => journal.id,
           'user' => reference(base, 'users', journal.user),

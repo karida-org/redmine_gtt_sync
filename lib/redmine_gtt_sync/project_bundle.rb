@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module RedmineGttSync
   # Optimized, QTask-shaped payload for a whole project in one call: issues split
   # by geometry type (point/line/polygon) plus the geometry-less "unplaced" ones,
@@ -91,6 +93,13 @@ module RedmineGttSync
         'created_on' => issue.created_on&.iso8601,
         'updated_on' => issue.updated_on&.iso8601,
         'lock_version' => issue.lock_version,
+        # Whether the CURRENT user may edit this issue's attributes (geometry and
+        # status included) - attributes_editable?, not editable?, which also ORs
+        # notes-addable. Persisted per feature so a client can fail closed on
+        # map-side editing instead of offering writes Redmine will reject.
+        # Redmine memoizes roles per (user, project), so this stays cheap across
+        # a large bundle.
+        'editable' => issue.attributes_editable?(User.current),
         'custom_fields' => CustomFields.values(issue)
       }
     end

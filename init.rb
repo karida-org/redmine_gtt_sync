@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'redmine'
 require_relative 'lib/redmine_gtt_sync/oauth'
 require_relative 'lib/redmine_gtt_sync/capabilities'
@@ -16,7 +18,7 @@ Redmine::Plugin.register :redmine_gtt_sync do
   name 'Redmine GTT Sync'
   author 'Daniel Kastl'
   description 'Sync/integration contract for GTT geometry: QGIS (QTask), QField, and OGC clients.'
-  version '0.4.0'
+  version '0.5.0'
   url 'https://github.com/karida-org/redmine_gtt_sync'
   author_url 'https://github.com/karida-org/redmine_gtt_sync'
 
@@ -31,7 +33,7 @@ Redmine::Plugin.register :redmine_gtt_sync do
   # Non member / Anonymous) for public integration if desired.
   project_module :gtt_sync do
     permission :use_gtt_sync,
-               { gtt_sync: %i[project_bundle project_schema issue] }
+               { gtt_sync: %i[project_bundle project_schema issue query_bundle] }
   end
 
   # Which public OAuth application QTask advertises (its client_id) on the
