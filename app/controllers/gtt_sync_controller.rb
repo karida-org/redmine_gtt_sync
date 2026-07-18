@@ -10,7 +10,12 @@ class GttSyncController < ApplicationController
   # the server offers before it has credentials. The issue document is real
   # data, so it stays behind login + visibility.
   skip_before_action :check_if_login_required, only: [:capabilities]
-  accept_api_auth :capabilities, :issue, :project_bundle, :project_schema, :query_bundle
+  accept_api_auth :capabilities, :issue, :issue_documents, :project_bundle,
+                  :project_schema, :query_bundle
+
+  # Hard cap on ids per batch request, so one call can't turn into an
+  # unbounded response; a client with a larger scope chunks its requests.
+  ISSUE_DOCUMENTS_LIMIT = 100
 
   def capabilities
     render json: RedmineGttSync::Capabilities.report
@@ -28,6 +33,50 @@ class GttSyncController < ApplicationController
            content_type: 'application/ld+json'
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Issue not found' }, status: :not_found
+  end
+
+  # Batch form of #issue: ?ids=1,2,3 returns { "issues": [document, ...] } with
+  # each entry in exactly the single-issue document shape. Exists for offline
+  # packaging (qtask#65/#80/#82), where fetching one document per issue made
+  # the serial loop the bottleneck on large scopes.
+  #
+  # Permission filtering matches the rest of the contract: Issue.visible gives
+  # per-project view_issues scoping (visibility, private issues), the
+  # use_gtt_sync project gate is pushed into the query like query_bundle, and
+  # the per-user parts of each document (private notes, editable contract,
+  # visible details) are handled inside IssueDocument.build. Ids that resolve
+  # to nothing the user may see are omitted rather than reported, so existence
+  # is not leaked - a client treats a missing entry like the single-issue 404.
+  def issue_documents
+    # Malformed input is a client error (400), unlike a valid id that resolves
+    # to nothing (omitted): silently dropping bad tokens would let a broken
+    # client read `ids=1,abc` as a clean answer for issue 1. The cap counts raw
+    # tokens (before dedup) so repeats can't smuggle an oversized request.
+    raw_ids = params[:ids].to_s.split(',', -1)
+    if raw_ids.empty?
+      return render json: {
+        error: 'ids is required: a comma-separated list of issue ids'
+      }, status: :bad_request
+    end
+    if raw_ids.size > ISSUE_DOCUMENTS_LIMIT
+      return render json: {
+        error: "at most #{ISSUE_DOCUMENTS_LIMIT} ids per request"
+      }, status: :bad_request
+    end
+
+    ids = raw_ids.map { |raw| Integer(raw.strip, exception: false) }
+    if ids.any? { |id| id.nil? || id <= 0 }
+      return render json: {
+        error: 'ids must be a comma-separated list of positive issue ids'
+      }, status: :bad_request
+    end
+
+    issues = Issue.visible.where(id: ids.uniq, project_id: gtt_sync_project_ids).to_a
+    preload_document_associations(issues)
+    base = canonical_base_url
+    render json: {
+      'issues' => issues.map { |issue| RedmineGttSync::IssueDocument.build(issue, base_url: base) }
+    }
   end
 
   # Whole project in one optimized, permission-scoped payload. Project.visible
@@ -126,6 +175,23 @@ class GttSyncController < ApplicationController
         { custom_values: :custom_field }
       ]
     ).call
+  end
+
+  # The full-document endpoints serialize the rich sections on top of the
+  # summary fields, so batch document builds also preload journals (with users
+  # and change details), attachments, changesets, and both relation directions
+  # - otherwise a 100-issue batch fans out into hundreds of per-issue queries.
+  def preload_document_associations(issues)
+    ActiveRecord::Associations::Preloader.new(
+      records: issues,
+      associations: [
+        :status, :tracker, :author, :changesets,
+        { journals: %i[user details] },
+        { attachments: :author },
+        { relations_from: :issue_to, relations_to: :issue_from }
+      ]
+    ).call
+    preload_issue_associations(issues)
   end
 
   # Governance gate: integration access requires BOTH
