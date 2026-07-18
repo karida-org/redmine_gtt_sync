@@ -172,6 +172,14 @@ module RedmineGttSync
         journals relations changesets attachments visible_custom_field_values
       ].freeze
 
+      # State behind the argful RBAC/option readers below, settable only via
+      # the constructor (the readers deliberately don't mirror these names).
+      CONFIG_ATTRS = %i[
+        safe_attribute_names new_statuses_allowed_to
+        editable_custom_field_values assignable_users assignable_versions
+        deletable notes_addable attachments_addable attributes_editable
+      ].freeze
+
       attr_accessor(*DATA_ATTRS)
       # Reference option sources (no user argument in the real model; they are
       # resolved against the issue's own project/tracker context).
@@ -192,7 +200,15 @@ module RedmineGttSync
         @notes_addable = true
         @attachments_addable = true
         @attributes_editable = true
-        attrs.each { |key, value| instance_variable_set(:"@#{key}", value) }
+        attrs.each do |key, value|
+          unless DATA_ATTRS.include?(key) || CONFIG_ATTRS.include?(key)
+            # Fail loudly on a typo; a silently ignored key would leave the
+            # default in place and defeat the point of a typed double.
+            raise ArgumentError, "unknown IssueDouble attribute: #{key}"
+          end
+
+          instance_variable_set(:"@#{key}", value)
+        end
       end
 
       # The RBAC surface, mirroring the real Issue arities (an optional user
