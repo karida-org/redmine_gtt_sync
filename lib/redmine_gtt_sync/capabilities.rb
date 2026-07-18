@@ -12,18 +12,21 @@ module RedmineGttSync
   #   only when its route is actually defined. Adding an endpoint (with its named
   #   route) flips the flag on its own; nothing here needs editing per feature.
   module Capabilities
-    # capability => the named route that implements it. Route names are
-    # provisional until each endpoint lands; the detection is what matters.
+    # capability => the named route that implements it. Keys whose route does
+    # not exist yet are deliberate: they report false today and flip to true on
+    # their own the moment the endpoint lands with its named route (see the
+    # module comment). Their route names are provisional until then; each is
+    # tagged with the issue that tracks the planned endpoint.
     CONTRACT_ROUTES = {
       issue_jsonld: :gtt_sync_issue,
       project_bundle: :gtt_sync_project_bundle,
       query_bundle: :gtt_sync_query_bundle,
-      bulk_geometry_write: :gtt_sync_bulk_geometry,
-      geometry_only_patch: :gtt_sync_geometry,
-      change_feed: :gtt_sync_changes,
+      bulk_geometry_write: :gtt_sync_bulk_geometry, # planned: issue #9
+      geometry_only_patch: :gtt_sync_geometry, # planned: issue #10
+      change_feed: :gtt_sync_changes, # planned: issue #7
       schema_introspection: :gtt_sync_project_schema,
-      ogc_api_features: :gtt_sync_ogc_features,
-      wfs_t: :gtt_sync_wfs_transaction
+      ogc_api_features: :gtt_sync_ogc_features, # planned: issue #11
+      wfs_t: :gtt_sync_wfs_transaction # planned: issue #11
     }.freeze
 
     module_function

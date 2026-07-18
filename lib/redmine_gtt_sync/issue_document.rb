@@ -254,9 +254,13 @@ module RedmineGttSync
       else
         record.to_s
       end
-    rescue StandardError => e
-      # Never let a label lookup break the document, but leave a trace so a real
-      # reflection/query fault is diagnosable rather than silently swallowed.
+    rescue NameError, ActiveRecord::RecordNotFound => e
+      # Degrade to no label only for the expected lookup faults (a reflection
+      # whose class can't be resolved, e.g. a polymorphic association, or a
+      # record lookup miss; NameError also covers NoMethodError), with a trace
+      # so the fault stays diagnosable. Anything else raises: a broad rescue
+      # here would mask real bugs by silently degrading every history label
+      # instead of failing a test.
       Rails.logger&.warn(
         "[gtt_sync] reference label lookup failed for #{assoc_name}=#{value}: " \
         "#{e.class}: #{e.message}"
