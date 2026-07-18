@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
 require File.expand_path('../../test_helper', __FILE__)
-require 'ostruct'
+require File.expand_path('../../doubles', __FILE__)
 
 class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
+  include RedmineGttSync::TestDoubles
+
   setup do
     # build() reads User.current for the changeset permission gate; with empty
     # associations below the rich sections just come back empty. (Populated
@@ -17,66 +19,46 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
 
   # A lightweight stand-in for an Issue: the builder only reads attributes and
   # associations, so this avoids DB fixtures and keeps the test a pure unit.
-  def fake_issue(geom: nil)
-    issue = OpenStruct.new(
+  # Permission methods default to allowed; tests that check gating override
+  # them via the keyword arguments (see IssueDouble).
+  def fake_issue(geom: nil, **overrides)
+    IssueDouble.new(
       id: 12,
       subject: 'Broken sign',
       description: 'A description',
-      status: OpenStruct.new(id: 1, name: 'New'),
-      tracker: OpenStruct.new(id: 2, name: 'Task'),
-      project: OpenStruct.new(id: 3, identifier: 'field-survey', name: 'Field Survey'),
+      status: NamedRef.new(id: 1, name: 'New'),
+      tracker: NamedRef.new(id: 2, name: 'Task'),
+      project: ProjectDouble.new(id: 3, identifier: 'field-survey',
+                                 name: 'Field Survey'),
       geom: geom,
       lock_version: 4,
       updated_on: Time.utc(2026, 7, 2, 10, 0, 0),
-      priority: OpenStruct.new(id: 2, name: 'Normal'),
-      author: OpenStruct.new(id: 7, name: 'Dev'),
-      assigned_to: OpenStruct.new(id: 8, name: 'Field Worker'),
-      category: nil,
-      fixed_version: nil,
-      parent_id: nil,
+      priority: NamedRef.new(id: 2, name: 'Normal'),
+      author: NamedRef.new(id: 7, name: 'Dev'),
+      assigned_to: NamedRef.new(id: 8, name: 'Field Worker'),
       start_date: Date.new(2026, 7, 1),
-      due_date: nil,
       done_ratio: 30,
-      estimated_hours: nil,
       is_private: false,
       created_on: Time.utc(2026, 6, 1, 9, 0, 0),
-      closed_on: nil,
-      journals: [],
-      relations: [],
-      changesets: [],
-      attachments: [],
-      visible_custom_field_values: []
+      # The RBAC editing contract (safe_attribute_names +
+      # new_statuses_allowed_to); the double mirrors the real argful arities.
+      safe_attribute_names: %w[subject description status_id geojson],
+      new_statuses_allowed_to: [
+        NamedRef.new(id: 1, name: 'New'), NamedRef.new(id: 2, name: 'In Progress')
+      ],
+      **overrides
     )
-    # These take a user arg, so they can't be plain OpenStruct readers; stub the
-    # RBAC editing contract (safe_attribute_names + new_statuses_allowed_to).
-    issue.stubs(:safe_attribute_names).returns(%w[subject description status_id geojson])
-    issue.stubs(:new_statuses_allowed_to).returns(
-      [OpenStruct.new(id: 1, name: 'New'), OpenStruct.new(id: 2, name: 'In Progress')]
-    )
-    # Issue-level action permissions also take a user arg; default to allowed
-    # (tests that check gating override these).
-    issue.stubs(:deletable?).returns(true)
-    issue.stubs(:notes_addable?).returns(true)
-    issue.stubs(:attachments_addable?).returns(true)
-    # editable_custom_field_values(user) drives the per-field `writable` flag;
-    # default to none editable (tests that check it override this).
-    issue.stubs(:editable_custom_field_values).returns([])
-    issue
   end
 
   # A lightweight stand-in for a visible journal note.
   def fake_journal(notes:, editable:, id: 1)
-    journal = OpenStruct.new(
+    JournalDouble.new(
       id: id,
-      user: OpenStruct.new(id: 7, name: 'Dev'),
+      user: NamedRef.new(id: 7, name: 'Dev'),
       created_on: Time.utc(2026, 7, 2, 10, 0, 0),
       notes: notes,
-      private_notes: false
+      editable: editable
     )
-    journal.stubs(:visible?).returns(true)
-    journal.stubs(:editable_by?).returns(editable)
-    journal.stubs(:visible_details).returns([])
-    journal
   end
 
   def test_builds_identity_references_and_geometry
@@ -146,9 +128,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   def test_editable_action_permissions_reflect_the_user_role
     # A user Redmine forbids from deleting/adding-notes gets false, so the client
     # hides those actions (Redmine still enforces on write).
-    issue = fake_issue
-    issue.stubs(:deletable?).returns(false)
-    issue.stubs(:notes_addable?).returns(false)
+    issue = fake_issue(deletable: false, notes_addable: false)
     doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')
     assert_equal false, doc['editable']['can_delete']
     assert_equal false, doc['editable']['can_add_notes']
@@ -160,25 +140,20 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://x')
     assert_equal true, doc['editable']['can_add_attachments']
 
-    issue = fake_issue
-    issue.stubs(:attachments_addable?).returns(false)
+    issue = fake_issue(attachments_addable: false)
     doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')
     assert_equal false, doc['editable']['can_add_attachments']
   end
 
   # A lightweight stand-in for a visible attachment.
   def fake_attachment(editable:, deletable:, id: 1)
-    attachment = OpenStruct.new(
-      id: id, filename: 'photo.jpg', filesize: 2048,
-      content_type: 'image/jpeg', description: nil,
-      author: OpenStruct.new(id: 7, name: 'Dev'),
-      created_on: Time.utc(2026, 7, 2, 10, 0, 0)
+    AttachmentDouble.new(
+      id: id,
+      author: NamedRef.new(id: 7, name: 'Dev'),
+      created_on: Time.utc(2026, 7, 2, 10, 0, 0),
+      editable: editable,
+      deletable: deletable
     )
-    attachment.stubs(:visible?).returns(true)
-    attachment.stubs(:image?).returns(true)
-    attachment.stubs(:editable?).returns(editable)
-    attachment.stubs(:deletable?).returns(deletable)
-    attachment
   end
 
   def test_attachment_carries_editable_and_deletable_flags
@@ -216,15 +191,15 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_custom_field_values_carry_format_multiple_and_edit_metadata
-    field = OpenStruct.new(
+    field = CustomFieldDouble.new(
       id: 5, name: 'Severity', field_format: 'list', multiple: false,
       possible_values: %w[Low Medium High]
     )
-    value = OpenStruct.new(custom_field: field, custom_field_id: 5, value: 'High')
-    issue = fake_issue
-    issue.visible_custom_field_values = [value]
+    value = CustomValue.new(custom_field: field, custom_field_id: 5, value: 'High')
     # This user may edit field 5, so it comes back writable with its options.
-    issue.stubs(:editable_custom_field_values).returns([value])
+    issue = fake_issue(
+      visible_custom_field_values: [value], editable_custom_field_values: [value]
+    )
 
     cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields']
     assert_equal 1, cf.size
@@ -238,10 +213,11 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_editable_references_offer_options_only_for_writable_fields
-    issue = fake_issue
-    issue.stubs(:safe_attribute_names).returns(%w[subject assigned_to_id priority_id])
-    issue.stubs(:assignable_users).returns([OpenStruct.new(id: 8, name: 'Field Worker')])
-    IssuePriority.stubs(:active).returns([OpenStruct.new(id: 2, name: 'Normal')])
+    issue = fake_issue(
+      safe_attribute_names: %w[subject assigned_to_id priority_id],
+      assignable_users: [NamedRef.new(id: 8, name: 'Field Worker')]
+    )
+    IssuePriority.stubs(:active).returns([NamedRef.new(id: 2, name: 'Normal')])
     # The non-writable reference fields must not be queried at all.
     issue.expects(:assignable_versions).never
     issue.project.expects(:issue_categories).never
@@ -256,14 +232,13 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_editable_references_cover_all_four_reference_fields
-    issue = fake_issue
-    issue.stubs(:safe_attribute_names).returns(
-      %w[assigned_to_id priority_id category_id fixed_version_id]
+    issue = fake_issue(
+      safe_attribute_names: %w[assigned_to_id priority_id category_id fixed_version_id],
+      assignable_users: [NamedRef.new(id: 8, name: 'Worker')],
+      assignable_versions: [NamedRef.new(id: 4, name: 'v1')]
     )
-    issue.stubs(:assignable_users).returns([OpenStruct.new(id: 8, name: 'Worker')])
-    issue.stubs(:assignable_versions).returns([OpenStruct.new(id: 4, name: 'v1')])
-    issue.project.stubs(:issue_categories).returns([OpenStruct.new(id: 3, name: 'Signs')])
-    IssuePriority.stubs(:active).returns([OpenStruct.new(id: 2, name: 'Normal')])
+    issue.project.issue_categories = [NamedRef.new(id: 3, name: 'Signs')]
+    IssuePriority.stubs(:active).returns([NamedRef.new(id: 2, name: 'Normal')])
 
     refs = RedmineGttSync::IssueDocument.build(
       issue, base_url: 'https://x'
@@ -275,14 +250,14 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_user_custom_field_value_carries_value_options
-    field = OpenStruct.new(id: 7, name: 'Reviewer', field_format: 'user',
-                           multiple: false, possible_values: nil)
     # possible_values_options yields [label, value] pairs for user/version fields,
     # resolved against the issue (so the options are the ones assignable here).
-    field.stubs(:possible_values_options).returns([%w[Alice 3], %w[Bob 5]])
-    value = OpenStruct.new(custom_field: field, custom_field_id: 7, value: '3')
-    issue = fake_issue
-    issue.visible_custom_field_values = [value]
+    field = CustomFieldDouble.new(
+      id: 7, name: 'Reviewer', field_format: 'user', multiple: false,
+      value_options: [%w[Alice 3], %w[Bob 5]]
+    )
+    value = CustomValue.new(custom_field: field, custom_field_id: 7, value: '3')
+    issue = fake_issue(visible_custom_field_values: [value])
 
     cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields'][0]
     assert_equal 'user', cf['field_format']
@@ -293,11 +268,12 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_list_custom_field_value_has_empty_value_options
-    field = OpenStruct.new(id: 5, name: 'Severity', field_format: 'list',
-                           multiple: false, possible_values: %w[Low High])
-    value = OpenStruct.new(custom_field: field, custom_field_id: 5, value: 'High')
-    issue = fake_issue
-    issue.visible_custom_field_values = [value]
+    field = CustomFieldDouble.new(
+      id: 5, name: 'Severity', field_format: 'list', multiple: false,
+      possible_values: %w[Low High]
+    )
+    value = CustomValue.new(custom_field: field, custom_field_id: 5, value: 'High')
+    issue = fake_issue(visible_custom_field_values: [value])
 
     cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields'][0]
     # list uses possible_values (strings); value_options stays empty.
@@ -306,12 +282,14 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_custom_field_not_editable_is_marked_read_only
-    field = OpenStruct.new(id: 5, name: 'Severity', field_format: 'list',
-                           multiple: false, possible_values: [])
-    value = OpenStruct.new(custom_field: field, custom_field_id: 5, value: 'High')
-    issue = fake_issue
-    issue.visible_custom_field_values = [value]
-    # editable_custom_field_values is empty (the fake default), so not writable.
+    field = CustomFieldDouble.new(
+      id: 5, name: 'Severity', field_format: 'list', multiple: false,
+      possible_values: []
+    )
+    value = CustomValue.new(custom_field: field, custom_field_id: 5, value: 'High')
+    # editable_custom_field_values is empty (the double's default), so not
+    # writable.
+    issue = fake_issue(visible_custom_field_values: [value])
     cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields']
     assert_equal false, cf[0]['writable']
   end
@@ -324,13 +302,13 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_change_resolves_reference_attribute_to_display_name
-    detail = OpenStruct.new(property: 'attr', prop_key: 'status_id',
-                            old_value: '1', value: '2')
+    detail = ChangeDetail.new(property: 'attr', prop_key: 'status_id',
+                              old_value: '1', value: '2')
     klass = mock
-    klass.stubs(:find_by).with(id: '1').returns(OpenStruct.new(name: 'New'))
-    klass.stubs(:find_by).with(id: '2').returns(OpenStruct.new(name: 'In Progress'))
+    klass.stubs(:find_by).with(id: '1').returns(NamedRef.new(id: 1, name: 'New'))
+    klass.stubs(:find_by).with(id: '2').returns(NamedRef.new(id: 2, name: 'In Progress'))
     Issue.stubs(:reflect_on_association).with(:status)
-         .returns(OpenStruct.new(klass: klass))
+         .returns(Reflection.new(klass: klass))
 
     change = build_change(detail)
     # Raw ids stay authoritative; labels are added alongside.
@@ -341,12 +319,12 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_change_reference_label_omitted_when_record_deleted
-    detail = OpenStruct.new(property: 'attr', prop_key: 'fixed_version_id',
-                            old_value: nil, value: '99')
+    detail = ChangeDetail.new(property: 'attr', prop_key: 'fixed_version_id',
+                              old_value: nil, value: '99')
     klass = mock
     klass.stubs(:find_by).with(id: '99').returns(nil) # version removed since
     Issue.stubs(:reflect_on_association).with(:fixed_version)
-         .returns(OpenStruct.new(klass: klass))
+         .returns(Reflection.new(klass: klass))
 
     change = build_change(detail)
     assert_equal '99', change['new_value']
@@ -355,26 +333,26 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_change_literal_attribute_gets_no_label
-    detail = OpenStruct.new(property: 'attr', prop_key: 'done_ratio',
-                            old_value: '0', value: '30')
+    detail = ChangeDetail.new(property: 'attr', prop_key: 'done_ratio',
+                              old_value: '0', value: '30')
     change = build_change(detail)
     assert_equal({ 'property' => 'attr', 'name' => 'done_ratio',
                    'old_value' => '0', 'new_value' => '30' }, change)
   end
 
   def test_change_custom_field_and_attachment_get_no_reference_label
-    cf = OpenStruct.new(property: 'cf', prop_key: '1', old_value: '2', value: '3')
-    att = OpenStruct.new(property: 'attachment', prop_key: '4',
-                         old_value: nil, value: 'logo.png')
+    cf = ChangeDetail.new(property: 'cf', prop_key: '1', old_value: '2', value: '3')
+    att = ChangeDetail.new(property: 'attachment', prop_key: '4',
+                           old_value: nil, value: 'logo.png')
     refute build_change(cf).key?('new_label')
     refute build_change(att).key?('new_label')
   end
 
   def test_description_change_links_to_diff_and_omits_text
-    detail = OpenStruct.new(property: 'attr', prop_key: 'description',
-                            old_value: 'a very long old body',
-                            value: 'a very long new body',
-                            journal_id: 22, id: 34)
+    detail = ChangeDetail.new(property: 'attr', prop_key: 'description',
+                              old_value: 'a very long old body',
+                              value: 'a very long new body',
+                              journal_id: 22, id: 34)
     # A trailing slash on base must not double up in the URL.
     change = build_change(detail, 'https://x/')
     assert_equal 'https://x/journals/22/diff?detail_id=34', change['diff_url']
@@ -386,12 +364,12 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   # -- journals: private-note flag ------------------------------------------
 
   def test_journal_carries_private_notes_flag
-    journal = OpenStruct.new(id: 7, user: nil, created_on: nil,
-                             notes: 'internal only', private_notes: true)
-    journal.stubs(:visible?).returns(true)
-    # journals now reads editable_by? for every visible note (notes_editable).
-    journal.stubs(:editable_by?).returns(false)
-    journal.stubs(:visible_details).returns([])
+    # The user needs view_private_notes here: the honest private_notes? on the
+    # typed double means the private-note filter actually applies (the old
+    # OpenStruct fake answered nil to the predicate, silently skipping the
+    # filter this assertion depends on).
+    User.stubs(:current).returns(stub(allowed_to?: true))
+    journal = JournalDouble.new(id: 7, notes: 'internal only', private_notes: true)
     issue = fake_issue
     issue.journals = [journal]
 
@@ -400,5 +378,17 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     ]
     assert_equal true, journals[0]['private_notes']
     assert_equal 'internal only', journals[0]['notes']
+  end
+
+  def test_private_note_hidden_without_permission_unless_own
+    # The flip side of the flag: without view_private_notes another user's
+    # private note is filtered out entirely (the OpenStruct fakes couldn't
+    # exercise this branch - their private_notes? answered nil).
+    journal = JournalDouble.new(id: 7, notes: 'internal only', private_notes: true)
+    issue = fake_issue
+    issue.journals = [journal]
+
+    doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')
+    assert_equal [], doc['journals']
   end
 end

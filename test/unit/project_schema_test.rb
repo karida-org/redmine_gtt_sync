@@ -1,14 +1,16 @@
 # frozen_string_literal: true
 
 require File.expand_path('../../test_helper', __FILE__)
-require 'ostruct'
+require File.expand_path('../../doubles', __FILE__)
 
 class RedmineGttSyncProjectSchemaTest < ActiveSupport::TestCase
+  include RedmineGttSync::TestDoubles
+
   def test_custom_field_hash_shape_and_sorted_trackers
-    custom_field = OpenStruct.new(
+    custom_field = CustomFieldDouble.new(
       id: 5, name: 'Severity', field_format: 'list', is_required: true,
       multiple: false, possible_values: %w[Low Medium High],
-      trackers: [OpenStruct.new(id: 2), OpenStruct.new(id: 1)]
+      trackers: [NamedRef.new(id: 2), NamedRef.new(id: 1)]
     )
     # list uses possible_values strings, so value_options stays empty (and the
     # option lookup isn't even called - context is irrelevant here).
@@ -26,22 +28,22 @@ class RedmineGttSyncProjectSchemaTest < ActiveSupport::TestCase
   def test_custom_field_hash_without_context_is_backward_compatible
     # Called with just the field (no context): the arity stays compatible and
     # value_options is empty rather than raising on a nil context.
-    custom_field = OpenStruct.new(
+    custom_field = CustomFieldDouble.new(
       id: 7, name: 'Reviewer', field_format: 'user', is_required: false,
-      multiple: false, possible_values: nil, trackers: []
+      multiple: false
     )
     hash = RedmineGttSync::ProjectSchema.custom_field_hash(custom_field)
     assert_equal [], hash['value_options']
   end
 
   def test_user_custom_field_hash_carries_value_options
-    custom_field = OpenStruct.new(
+    custom_field = CustomFieldDouble.new(
       id: 7, name: 'Reviewer', field_format: 'user', is_required: false,
-      multiple: false, possible_values: nil,
-      trackers: [OpenStruct.new(id: 1)]
+      multiple: false, trackers: [NamedRef.new(id: 1)]
     )
     context = Object.new
-    # possible_values_options yields [label, value] pairs for user/version fields.
+    # possible_values_options yields [label, value] pairs for user/version
+    # fields; the mocha stub also asserts the context object is forwarded.
     custom_field.stubs(:possible_values_options).with(context)
                 .returns([%w[Alice 3], %w[Bob 5]])
 
@@ -54,15 +56,16 @@ class RedmineGttSyncProjectSchemaTest < ActiveSupport::TestCase
   end
 
   def test_writable_and_references_from_first_tracker_stand_in
-    project = project_with_tracker(OpenStruct.new(id: 1, name: 'Task'))
-    issue = mock('issue')
-    issue.stubs(:safe_attribute_names).returns(%w[subject assigned_to_id])
-    issue.stubs(:assignable_users).returns([OpenStruct.new(id: 8, name: 'Worker')])
+    project = project_with_tracker(NamedRef.new(id: 1, name: 'Task'))
+    issue = IssueDouble.new(
+      safe_attribute_names: %w[subject assigned_to_id],
+      assignable_users: [NamedRef.new(id: 8, name: 'Worker')]
+    )
     # The non-writable reference fields must not be queried at all.
     issue.expects(:assignable_versions).never
     Issue.stubs(:new).returns(issue)
 
-    result = RedmineGttSync::ProjectSchema.writable_and_references(project, OpenStruct.new)
+    result = RedmineGttSync::ProjectSchema.writable_and_references(project, stub)
     assert_equal %w[subject assigned_to_id], result['writable']
     assert_equal [{ 'id' => 8, 'name' => 'Worker' }],
                  result['references']['assigned_to_id']
@@ -71,7 +74,7 @@ class RedmineGttSyncProjectSchemaTest < ActiveSupport::TestCase
 
   def test_writable_and_references_empty_without_tracker
     result = RedmineGttSync::ProjectSchema.writable_and_references(
-      project_with_tracker(nil), OpenStruct.new
+      project_with_tracker(nil), stub
     )
     assert_equal [], result['writable']
     assert_equal({}, result['references'])
@@ -82,8 +85,6 @@ class RedmineGttSyncProjectSchemaTest < ActiveSupport::TestCase
   # A stand-in project whose trackers.sorted.first is +tracker+ (or none when
   # +tracker+ is nil).
   def project_with_tracker(tracker)
-    trackers = mock('trackers')
-    trackers.stubs(:sorted).returns([tracker].compact)
-    OpenStruct.new(trackers: trackers)
+    ProjectDouble.new(trackers: [tracker].compact)
   end
 end
