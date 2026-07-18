@@ -149,6 +149,58 @@ class GttSyncControllerTest < ActionController::TestCase
     assert(doc['journals'].any? { |j| j['details'].any? })
   end
 
+  test 'batch issue documents returns single-issue-shaped docs in one response' do
+    @request.session[:user_id] = 1
+    get :issue_documents, params: { ids: '1,2,3' }
+    assert_response :success
+    docs = JSON.parse(response.body)['issues']
+    assert_equal [1, 2, 3], docs.map { |d| d['identifier'] }.sort
+    # Each entry carries the same canonical sections as the single-issue
+    # endpoint, so a client can reuse one parser for both.
+    docs.each do |doc|
+      assert doc.key?('@id')
+      assert doc.key?('journals')
+      assert doc.key?('editable')
+      assert doc.key?('lock_version')
+    end
+    # Issue 1 has journals in the fixtures - the rich sections really render.
+    assert(docs.find { |d| d['identifier'] == 1 }['journals'].any?)
+  end
+
+  test 'batch omits issues outside integration-enabled projects' do
+    # Issue 4 is in project 2, which never got the gtt_sync module in setup:
+    # it is silently omitted (the batch counterpart of the single-issue gate),
+    # not an error that fails the whole request.
+    @request.session[:user_id] = 1
+    get :issue_documents, params: { ids: '1,4' }
+    assert_response :success
+    identifiers = JSON.parse(response.body)['issues'].map { |d| d['identifier'] }
+    assert_equal [1], identifiers
+  end
+
+  test 'batch omits unknown ids without failing the request' do
+    @request.session[:user_id] = 1
+    get :issue_documents, params: { ids: '1,999999' }
+    assert_response :success
+    identifiers = JSON.parse(response.body)['issues'].map { |d| d['identifier'] }
+    assert_equal [1], identifiers
+  end
+
+  test 'batch without usable ids is a bad request' do
+    @request.session[:user_id] = 1
+    get :issue_documents, params: { ids: '' }
+    assert_response :bad_request
+    get :issue_documents, params: { ids: 'abc,,-' }
+    assert_response :bad_request
+  end
+
+  test 'batch enforces the per-request id cap' do
+    @request.session[:user_id] = 1
+    too_many = (1..(GttSyncController::ISSUE_DOCUMENTS_LIMIT + 1)).to_a.join(',')
+    get :issue_documents, params: { ids: too_many }
+    assert_response :bad_request
+  end
+
   test 'issue is forbidden without integration access' do
     # Issue 1 is in project 1; the user can view it, but with the module
     # disabled the integration gate returns 403.

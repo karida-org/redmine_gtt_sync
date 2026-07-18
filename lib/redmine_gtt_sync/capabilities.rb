@@ -19,6 +19,7 @@ module RedmineGttSync
     # tagged with the issue that tracks the planned endpoint.
     CONTRACT_ROUTES = {
       issue_jsonld: :gtt_sync_issue,
+      issue_documents_batch: :gtt_sync_issue_documents,
       project_bundle: :gtt_sync_project_bundle,
       query_bundle: :gtt_sync_query_bundle,
       bulk_geometry_write: :gtt_sync_bulk_geometry, # planned: issue #9

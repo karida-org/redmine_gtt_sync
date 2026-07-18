@@ -25,6 +25,16 @@ get 'gtt_sync/capabilities',
     as: 'gtt_sync_capabilities',
     defaults: { format: 'json' }
 
+# Batch form of the issue document: ?ids=1,2,3 returns the same per-issue
+# JSON-LD documents in one response (capped per request), so offline packaging
+# doesn't fan out into one round-trip per issue. Ids the user may not see (or
+# that don't exist, or whose project lacks the integration) are omitted, not
+# errors - the same non-leaking behavior as the single-issue 404.
+get 'gtt_sync/issues',
+    to: 'gtt_sync#issue_documents',
+    as: 'gtt_sync_issue_documents',
+    defaults: { format: 'json' }
+
 # A single issue as a JSON-LD document (canonical @id IRI + geometry as GeoJSON
 # and EWKT). Requires auth and respects issue visibility.
 get 'gtt_sync/issues/:id',
