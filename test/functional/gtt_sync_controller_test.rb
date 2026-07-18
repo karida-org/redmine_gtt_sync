@@ -186,11 +186,17 @@ class GttSyncControllerTest < ActionController::TestCase
     assert_equal [1], identifiers
   end
 
-  test 'batch without usable ids is a bad request' do
+  test 'batch with malformed ids is a bad request' do
+    # Malformed input is rejected outright - silently dropping a bad token
+    # would let a broken client read `ids=1,abc` as a clean answer for 1.
     @request.session[:user_id] = 1
     get :issue_documents, params: { ids: '' }
     assert_response :bad_request
     get :issue_documents, params: { ids: 'abc,,-' }
+    assert_response :bad_request
+    get :issue_documents, params: { ids: '1,abc' }
+    assert_response :bad_request
+    get :issue_documents, params: { ids: '1,-2' }
     assert_response :bad_request
   end
 
@@ -198,6 +204,11 @@ class GttSyncControllerTest < ActionController::TestCase
     @request.session[:user_id] = 1
     too_many = (1..(GttSyncController::ISSUE_DOCUMENTS_LIMIT + 1)).to_a.join(',')
     get :issue_documents, params: { ids: too_many }
+    assert_response :bad_request
+    # The cap counts raw tokens, so duplicates can't smuggle an oversized
+    # request past a post-dedup size check.
+    repeats = Array.new(GttSyncController::ISSUE_DOCUMENTS_LIMIT + 1, '1').join(',')
+    get :issue_documents, params: { ids: repeats }
     assert_response :bad_request
   end
 

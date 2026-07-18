@@ -48,21 +48,30 @@ class GttSyncController < ApplicationController
   # to nothing the user may see are omitted rather than reported, so existence
   # is not leaked - a client treats a missing entry like the single-issue 404.
   def issue_documents
-    ids = params[:ids].to_s.split(',').filter_map do |raw|
-      Integer(raw.strip, exception: false)
-    end.uniq
-    if ids.empty?
+    # Malformed input is a client error (400), unlike a valid id that resolves
+    # to nothing (omitted): silently dropping bad tokens would let a broken
+    # client read `ids=1,abc` as a clean answer for issue 1. The cap counts raw
+    # tokens (before dedup) so repeats can't smuggle an oversized request.
+    raw_ids = params[:ids].to_s.split(',', -1)
+    if raw_ids.empty?
       return render json: {
         error: 'ids is required: a comma-separated list of issue ids'
       }, status: :bad_request
     end
-    if ids.size > ISSUE_DOCUMENTS_LIMIT
+    if raw_ids.size > ISSUE_DOCUMENTS_LIMIT
       return render json: {
         error: "at most #{ISSUE_DOCUMENTS_LIMIT} ids per request"
       }, status: :bad_request
     end
 
-    issues = Issue.visible.where(id: ids, project_id: gtt_sync_project_ids).to_a
+    ids = raw_ids.map { |raw| Integer(raw.strip, exception: false) }
+    if ids.any? { |id| id.nil? || id <= 0 }
+      return render json: {
+        error: 'ids must be a comma-separated list of positive issue ids'
+      }, status: :bad_request
+    end
+
+    issues = Issue.visible.where(id: ids.uniq, project_id: gtt_sync_project_ids).to_a
     preload_document_associations(issues)
     base = canonical_base_url
     render json: {
