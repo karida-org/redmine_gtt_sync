@@ -1,12 +1,14 @@
 # frozen_string_literal: true
 
 require File.expand_path('../../test_helper', __FILE__)
-require 'ostruct'
+require File.expand_path('../../doubles', __FILE__)
 
 class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
+  include RedmineGttSync::TestDoubles
+
   setup do
     # summary() reads User.current for the per-feature editable flag; the fake
-    # issues stub attributes_editable? themselves, so any user object works.
+    # issues answer attributes_editable? themselves, so any user object works.
     User.stubs(:current).returns(stub)
   end
 
@@ -18,29 +20,26 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
     id, geom:, status_id: 1, tracker_id: 2, custom_field_values: [],
     attributes_editable: true, **extra
   )
-    record = OpenStruct.new(
-      {
-        id: id, subject: "Issue #{id}", status_id: status_id,
-        tracker_id: tracker_id, lock_version: 0, geom: geom,
-        visible_custom_field_values: custom_field_values
-      }.merge(extra)
+    IssueDouble.new(
+      id: id, subject: "Issue #{id}", status_id: status_id,
+      tracker_id: tracker_id, lock_version: 0, geom: geom,
+      visible_custom_field_values: custom_field_values,
+      attributes_editable: attributes_editable,
+      **extra
     )
-    # Takes a user arg, so it can't be a plain OpenStruct reader.
-    record.stubs(:attributes_editable?).returns(attributes_editable)
-    record
   end
 
   # A named reference (priority/assignee/category/version) as the summary reads
   # it: only #name matters.
   def named(name)
-    OpenStruct.new(name: name)
+    NamedRef.new(name: name)
   end
 
   def custom_value(id:, name:, value:, field_format: 'string', multiple: false)
-    field = OpenStruct.new(
+    field = CustomFieldDouble.new(
       id: id, name: name, field_format: field_format, multiple: multiple
     )
-    OpenStruct.new(custom_field: field, value: value)
+    CustomValue.new(custom_field: field, value: value)
   end
 
   def ring
@@ -49,7 +48,7 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
   end
 
   def project(with_boundary: true)
-    OpenStruct.new(
+    ProjectDouble.new(
       id: 2, identifier: 'field-survey', name: 'Field Survey',
       geom: with_boundary ? factory.polygon(ring) : nil
     )
