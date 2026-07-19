@@ -12,22 +12,32 @@ module RedmineGttSync
   # (e.g. adding :add_issue_notes) without a client release.
   module OAuth
     # Ordered so the advertised list is stable across requests. Least privilege
-    # for the QTask (QGIS) client: list/pick projects, read/create/edit/delete
-    # issues, work with notes (add, edit/delete, private), set the issue Private
-    # flag, read GTT styling, and pass the gtt_sync integration gate.
+    # for the QTask (QGIS) client: list/pick projects, edit a project's boundary,
+    # read/create/edit/delete issues, work with notes (add, edit/delete,
+    # private), set the issue Private flag, read GTT styling, and pass the
+    # gtt_sync integration gate.
     #
-    # Notes need explicit scopes: over OAuth, Redmine gates permissions by the
-    # token's scopes even for an admin, so edit_issues alone only lets a *public*
-    # note through - add_issue_notes/view_private_notes/set_notes_private are
-    # required for the panel's note features (add, see, and mark private), and
-    # edit_issue_notes/edit_own_issue_notes for editing or clearing (= deleting)
-    # a note via the stock PUT /journals/:id write. delete_issues gates issue
-    # deletion. Every scope here maps to a real Redmine permission (Doorkeeper
-    # scopes = AccessControl.permissions). Adding a scope widens the OAuth app
-    # and the advertised list; existing connections re-authorize on scope drift.
+    # Over OAuth, Redmine gates permissions by the token's scopes even for an
+    # admin (effective = role permissions & token scopes, see
+    # Role#allowed_permissions), so each write feature needs its scope:
+    # - edit_project gates the project-boundary write (QTask's PUT
+    #   /projects/:id.json with the redmine_gtt geojson safe-attribute); without
+    #   it a boundary save is refused over OAuth even for a user who may edit the
+    #   project. It only lifts the OAuth ceiling - the per-user edit_project
+    #   permission is still the floor, so a user without it is still denied.
+    # - edit_issues alone only lets a *public* note through, so
+    #   add_issue_notes/view_private_notes/set_notes_private are required for the
+    #   panel's note features (add, see, and mark private), and
+    #   edit_issue_notes/edit_own_issue_notes for editing or clearing
+    #   (= deleting) a note via the stock PUT /journals/:id write.
+    # - delete_issues gates issue deletion.
+    # Every scope here maps to a real Redmine permission (Doorkeeper scopes =
+    # AccessControl.permissions). Adding a scope widens the OAuth app and the
+    # advertised list; existing connections re-authorize on scope drift.
     SCOPES = %w[
       view_project
       search_project
+      edit_project
       view_issues
       add_issues
       edit_issues

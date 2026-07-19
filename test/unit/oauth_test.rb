@@ -3,6 +3,22 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class RedmineGttSyncOAuthTest < ActiveSupport::TestCase
+  def test_scopes_cover_the_project_boundary_write
+    # The boundary write is PUT /projects/:id.json (redmine_gtt geojson
+    # safe-attribute), gated by edit_project. Without the scope a boundary save
+    # is refused over OAuth even for a user who may edit the project (#75).
+    assert_includes RedmineGttSync::OAuth::SCOPES, 'edit_project'
+  end
+
+  def test_every_scope_is_a_real_redmine_permission
+    # Doorkeeper scopes = AccessControl.permissions: a scope that maps to no
+    # permission would never be grantable. Guards typos in the list.
+    permissions = Redmine::AccessControl.permissions.map { |p| p.name.to_s }
+    RedmineGttSync::OAuth::SCOPES.each do |scope|
+      assert_includes permissions, scope, "#{scope} is not a Redmine permission"
+    end
+  end
+
   def test_advertisement_includes_client_id_only_when_given
     base = 'https://demo.example.org'
     without = RedmineGttSync::OAuth.advertisement(base)
