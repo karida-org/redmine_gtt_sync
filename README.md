@@ -36,9 +36,10 @@ Shipped:
 - **Issue documents**: a single-issue rich document (description, journals,
   attachments, relations) and a batch endpoint used for offline packaging.
 - **Schema introspection** (`GET /gtt_sync/projects/:id/schema`): trackers,
-  custom fields, references, and the writable field set per user, so clients
-  can grey out what they may not write instead of losing edits to silent
-  `safe_attributes` drops.
+  custom fields, references, the writable field set per user, and whether the
+  user may edit the project itself (`project.can_edit_project`, which gates the
+  boundary write), so clients can grey out what they may not write instead of
+  losing edits to silent `safe_attributes` drops.
 - **OAuth onboarding**: a plugin setting selects (or one-click creates) the
   public PKCE OAuth application to advertise, and a "Connect QGIS" page (any
   logged-in user) shows the connection details and serves a downloadable QGIS

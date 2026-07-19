@@ -17,7 +17,15 @@ module RedmineGttSync
         'project' => {
           'id' => project.id,
           'identifier' => project.identifier,
-          'name' => project.name
+          'name' => project.name,
+          # Whether this user may write the project itself (its boundary rides
+          # here: QTask saves it via PUT /projects/:id with the redmine_gtt
+          # geojson safe-attribute, gated by edit_project). Advisory-only, for
+          # the client to grey out the boundary action; the server authorize is
+          # still the gate. Reflects Redmine's effective permission, so over
+          # OAuth it already honours the token's scopes (edit_project) as well
+          # as the user's role.
+          'can_edit_project' => user.allowed_to?(:edit_project, project)
         },
         'trackers' => project.trackers.sorted.map { |t| { 'id' => t.id, 'name' => t.name } },
         'statuses' => IssueStatus.sorted.map do |s|
