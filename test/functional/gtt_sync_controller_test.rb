@@ -113,6 +113,8 @@ class GttSyncControllerTest < ActionController::TestCase
     assert_includes body['writable'], 'subject'
     assert_includes body['writable'], 'geojson'
     assert(body['custom_fields'].any? { |cf| cf['name'] == 'Severity' })
+    # The project block carries the boundary-write affordance (#75); admin may.
+    assert_equal true, body['project']['can_edit_project']
   end
 
   test 'schema returns 404 for an unknown project' do

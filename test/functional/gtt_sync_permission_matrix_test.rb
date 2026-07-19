@@ -136,7 +136,25 @@ class GttSyncPermissionMatrixTest < ActionController::TestCase
     assert_response :success
   end
 
+  test 'schema can_edit_project is false without edit_project and true with it' do
+    # The boundary-write affordance (qtask#255 / #75): the schema tells the
+    # client whether this user may write the project (its boundary), so QTask
+    # can grey out the action instead of relying on a 403. Mirrors Redmine's
+    # own edit_project permission, no stubs.
+    grant # view-only member, no edit_project
+    assert_equal false, schema_can_edit_project
+
+    grant :edit_project
+    assert_equal true, schema_can_edit_project
+  end
+
   private
+
+  def schema_can_edit_project
+    get :project_schema, params: { id: 'ecookbook' }
+    assert_response :success
+    JSON.parse(response.body)['project']['can_edit_project']
+  end
 
   # Adds a journal note as +user+ and returns it. Loads the issue fresh each
   # time: init_journal + save! on an already-clean instance is a no-op (no new
