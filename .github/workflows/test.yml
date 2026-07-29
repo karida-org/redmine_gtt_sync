@@ -140,6 +140,17 @@ jobs:
             plugins/${{ env.PLUGIN_NAME }}/test/unit \
             plugins/${{ env.PLUGIN_NAME }}/test/functional
 
+      # Eager-load gate. Test and development environments load lazily, so a
+      # filename/constant mismatch this plugin never trips at boot can still
+      # make a production instance (which eager loads) die with a NameError.
+      # That is exactly what #81 was: green CI, unbootable production. This
+      # task eager loads everything and fails on that class of mismatch.
+      - name: Check eager loading
+        env:
+          RAILS_ENV: test
+        working-directory: redmine
+        run: bundle exec rake zeitwerk:check
+
   # Style/lint gate. Standalone (no Redmine checkout needed): it only inspects
   # this plugin's own Ruby against .rubocop.yml, so it's fast and independent of
   # the test matrix. RuboCop is pinned so a release bump can't turn CI red
