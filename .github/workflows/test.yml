@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout Redmine
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: redmine/redmine
           ref: ${{ matrix.redmine_version }}
@@ -62,7 +62,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout redmine_gtt (required dependency)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: gtt-project/redmine_gtt
           # Intentionally the mutable `next` branch: this plugin tracks
@@ -74,13 +74,13 @@ jobs:
           persist-credentials: false
 
       - name: Checkout plugin
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: redmine/plugins/${{ env.PLUGIN_NAME }}
           persist-credentials: false
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1.316.0
+        uses: ruby/setup-ruby@a30dfa457ad68707b8b910ac3a244714b61c0626 # v1.320.0
         with:
           ruby-version: ${{ matrix.ruby_version }}
 
@@ -161,12 +161,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout plugin
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1.316.0
+        uses: ruby/setup-ruby@a30dfa457ad68707b8b910ac3a244714b61c0626 # v1.320.0
         with:
           ruby-version: "3.4"
 
