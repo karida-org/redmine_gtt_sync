@@ -3,6 +3,20 @@
 require File.expand_path('../../test_helper', __FILE__)
 
 class RedmineGttSyncOAuthTest < ActiveSupport::TestCase
+  def test_zeitwerk_resolves_oauth_rb_to_the_acronym_constant
+    # Redmine's plugin loader adds plugin lib/ as an eager load path, so Zeitwerk
+    # derives this module's name from the filename. Without the inflection
+    # registered in init.rb it expects Oauth, and a production instance (which
+    # eager loads, unlike test) dies at boot with a NameError (#81). Pinned here
+    # so removing that line fails a test, not only the CI eager-load gate.
+    inflector = Rails.autoloaders.main.inflector
+    assert_equal 'OAuth', inflector.camelize('oauth', 'lib/redmine_gtt_sync/oauth.rb')
+    # Scoped to this exact basename: neighbouring oauth_* files keep the
+    # camelization Zeitwerk derives by default.
+    assert_equal 'OauthClient', inflector.camelize('oauth_client', 'x/oauth_client.rb')
+    assert_equal 'OauthProvider', inflector.camelize('oauth_provider', 'x/oauth_provider.rb')
+  end
+
   def test_scopes_cover_the_project_boundary_write
     # The boundary write is PUT /projects/:id.json (redmine_gtt geojson
     # safe-attribute), gated by edit_project. Without the scope a boundary save

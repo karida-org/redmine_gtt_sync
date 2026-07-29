@@ -1,6 +1,20 @@
 # frozen_string_literal: true
 
 require 'redmine'
+
+# Redmine's plugin loader adds every plugin's lib/ as an *eager load* path
+# (Redmine::PluginLoader.add_autoload_paths), so Zeitwerk manages these files
+# too and derives each constant from its filename. It would expect
+# `RedmineGttSync::Oauth` from oauth.rb, while the module is `OAuth`, and a
+# production instance (which eager loads, unlike test and development) dies at
+# boot with a NameError. Redmine registers the same kind of acronym override for
+# html/csv/pdf/url/pop3/imap in config/initializers/zeitwerk.rb.
+#
+# The key is the exact basename, so this affects only files named oauth.rb.
+# redmine_oauth's oauth_client.rb / oauth_provider.rb and Redmine's own
+# oauth2_applications_controller.rb are different basenames and unaffected.
+Rails.autoloaders.main.inflector.inflect('oauth' => 'OAuth')
+
 require_relative 'lib/redmine_gtt_sync/oauth'
 require_relative 'lib/redmine_gtt_sync/capabilities'
 require_relative 'lib/redmine_gtt_sync/geometry'
