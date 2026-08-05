@@ -21,8 +21,10 @@ module RedmineGttSync
     REFERENCE_FORMATS = %w[user version enumeration].freeze
 
     # Lean shape for the bundle (whole loaded set): identity + type + value.
-    def values(issue)
-      issue.visible_custom_field_values.map { |value| base(value) }
+    # +user+ is passed through to Redmine's visibility check explicitly (its
+    # default would silently fall back to User.current).
+    def values(issue, user)
+      issue.visible_custom_field_values(user).map { |value| base(value) }
     end
 
     # Selectable {value,label} options for a reference-like custom field,
@@ -50,7 +52,7 @@ module RedmineGttSync
       # A plain array (not a Set) so we don't depend on `set` being required;
       # the editable-field list per issue is small, so include? is fine.
       editable_ids = issue.editable_custom_field_values(user).map(&:custom_field_id)
-      issue.visible_custom_field_values.map do |value|
+      issue.visible_custom_field_values(user).map do |value|
         field = value.custom_field
         base(value).merge(
           'possible_values' => field.possible_values || [],

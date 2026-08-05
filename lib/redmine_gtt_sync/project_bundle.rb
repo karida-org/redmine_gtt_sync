@@ -18,6 +18,14 @@ module RedmineGttSync
       'Polygon' => 'polygon', 'MultiPolygon' => 'polygon'
     }.freeze
 
+    # The associations `summary` reads per issue. Callers that serialize many
+    # issues preload exactly this list (controller bundles, the change feed),
+    # so the set lives here, next to the code that depends on it.
+    SUMMARY_ASSOCIATIONS = [
+      :project, :priority, :assigned_to, :category, :fixed_version,
+      { custom_values: :custom_field }
+    ].freeze
+
     module_function
 
     # +issues+ must already be visibility-scoped (e.g. project.issues.visible);
@@ -102,7 +110,7 @@ module RedmineGttSync
         # Redmine memoizes roles per (user, project), so this stays cheap across
         # a large bundle.
         'editable' => issue.attributes_editable?(user),
-        'custom_fields' => CustomFields.values(issue)
+        'custom_fields' => CustomFields.values(issue, user)
       }
     end
 
