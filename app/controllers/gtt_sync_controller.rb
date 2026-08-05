@@ -11,7 +11,7 @@ class GttSyncController < ApplicationController
   # data, so it stays behind login + visibility.
   skip_before_action :check_if_login_required, only: [:capabilities]
   accept_api_auth :capabilities, :issue, :issue_documents, :project_bundle,
-                  :project_schema, :query_bundle
+                  :project_schema, :query_bundle, :changes
 
   # Hard cap on ids per batch request, so one call can't turn into an
   # unbounded response; a client with a larger scope chunks its requests.
@@ -157,6 +157,40 @@ class GttSyncController < ApplicationController
     render json: { error: 'Query not found' }, status: :not_found
   end
 
+  # Delta feed: the issues changed since a cursor (see ChangeFeed for the
+  # correctness model - cursor semantics, settle lag, deletion reconciliation).
+  # Scope defaults to every project where the user may integrate; an optional
+  # project_id narrows to one project, with the same 403 gate as the bundles.
+  def changes
+    cursor = RedmineGttSync::ChangeFeed.parse_cursor(params[:since])
+    if cursor.nil?
+      return render json: {
+        error: 'since is required: a token from a previous response, ' \
+               'or an ISO 8601 time for a first sync'
+      }, status: :bad_request
+    end
+
+    scope =
+      if params[:project_id].present?
+        project = find_visible_project(params[:project_id])
+        return unless integration_allowed?(project)
+
+        Issue.visible.where(project: project)
+      else
+        Issue.visible.where(project_id: gtt_sync_project_ids)
+      end
+
+    render json: RedmineGttSync::ChangeFeed.build(
+      scope, cursor,
+      user: User.current,
+      # Strict opt-in: only the documented truthy forms enable the (large)
+      # reconciliation id list; known_ids=0 stays off.
+      include_known_ids: %w[1 true].include?(params[:known_ids].to_s)
+    )
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Project not found' }, status: :not_found
+  end
+
   private
 
   # Ids of projects where the current user may use the integration
@@ -176,18 +210,13 @@ class GttSyncController < ApplicationController
     issues.select { |issue| allowed.include?(issue.project_id) }
   end
 
-  # Preload the associations the bundle serializes (custom values per issue,
-  # each issue's project for the project directory, and the reference fields the
-  # summary renders as names), so a large result doesn't fan out into per-issue
-  # N+1 queries. Takes an array (query.issues / *.to_a), so a relation preload
-  # won't do.
+  # Preload the associations the bundle summary serializes, so a large result
+  # doesn't fan out into per-issue N+1 queries. Takes an array (query.issues /
+  # *.to_a), so a relation preload won't do.
   def preload_issue_associations(issues)
     ActiveRecord::Associations::Preloader.new(
       records: issues,
-      associations: [
-        :project, :priority, :assigned_to, :category, :fixed_version,
-        { custom_values: :custom_field }
-      ]
+      associations: RedmineGttSync::ProjectBundle::SUMMARY_ASSOCIATIONS
     ).call
   end
 

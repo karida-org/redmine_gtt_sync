@@ -171,6 +171,8 @@ module RedmineGttSync
         created_on closed_on project_id status_id tracker_id
         journals relations changesets attachments visible_custom_field_values
       ].freeze
+      # visible_custom_field_values keeps its writer from attr_accessor; the
+      # reader is redefined below with the real model's optional-user arity.
 
       # State behind the argful RBAC/option readers below, settable only via
       # the constructor (the readers deliberately don't mirror these names).
@@ -215,6 +217,11 @@ module RedmineGttSync
       # argument) so the builders' calls can't drift from the signatures.
       def safe_attribute_names(_user = nil)
         @safe_attribute_names
+      end
+
+      # Real: Issue#visible_custom_field_values(user = nil).
+      def visible_custom_field_values(_user = nil)
+        @visible_custom_field_values
       end
 
       # Real: Issue#new_statuses_allowed_to(user = User.current,

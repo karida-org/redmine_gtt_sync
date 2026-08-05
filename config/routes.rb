@@ -42,6 +42,14 @@ get 'gtt_sync/issues/:id',
     as: 'gtt_sync_issue',
     defaults: { format: 'json' }
 
+# Delta feed: issues changed since a cursor (?since=token), so clients resync
+# incrementally instead of re-fetching a whole bundle. Optional project_id
+# narrows the scope; known_ids=1 adds the id set for deletion reconciliation.
+get 'gtt_sync/changes',
+    to: 'gtt_sync#changes',
+    as: 'gtt_sync_changes',
+    defaults: { format: 'json' }
+
 # Query-driven bundle: any saved query (project-scoped, cross-project, or
 # global) as one payload. Generalizes the project bundle. Requires ?query_id=N.
 get 'gtt_sync/bundle',
