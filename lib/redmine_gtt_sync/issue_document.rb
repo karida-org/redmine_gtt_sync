@@ -38,10 +38,12 @@ module RedmineGttSync
 
     # Build the JSON-LD hash for +issue+. +base_url+ is the instance origin
     # (e.g. "https://example.com"); IRIs are built from it so they match the
-    # instance's canonical addresses regardless of the request host.
-    def build(issue, base_url:)
+    # instance's canonical addresses regardless of the request host. +user+ is
+    # the acting user every permission-scoped section is resolved for - passed
+    # in explicitly (the controller hands over User.current) so this module
+    # stays a pure shaper with no hidden global input.
+    def build(issue, base_url:, user:)
       base = base_url.to_s.chomp('/')
-      user = User.current
       geom = issue.geom
       {
         '@context' => CONTEXT,

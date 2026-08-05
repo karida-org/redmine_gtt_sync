@@ -7,10 +7,11 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   include RedmineGttSync::TestDoubles
 
   setup do
-    # build() reads User.current for the changeset permission gate; with empty
-    # associations below the rich sections just come back empty. (Populated
-    # sections are covered against real records in the controller test.)
-    User.stubs(:current).returns(stub(allowed_to?: false))
+    # The acting user every build resolves permissions for. Denies everything
+    # (allowed_to? false); tests that need a permission pass their own user.
+    # (Populated sections are covered against real records + real RBAC in the
+    # functional tests.)
+    @viewer = stub(allowed_to?: false)
   end
 
   def factory
@@ -63,7 +64,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
 
   def test_builds_identity_references_and_geometry
     issue = fake_issue(geom: factory.point(135.3, 34.7, 0.0))
-    doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://example.com/')
+    doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://example.com/', user: @viewer)
 
     assert_equal 'https://example.com/issues/12', doc['@id']
     assert_equal 'gtt:Issue', doc['@type']
@@ -92,7 +93,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
 
   def test_issue_without_geometry_omits_geometry_keys
     doc = RedmineGttSync::IssueDocument.build(
-      fake_issue(geom: nil), base_url: 'https://example.com'
+      fake_issue(geom: nil), base_url: 'https://example.com', user: @viewer
     )
     refute doc.key?('geometry')
     refute doc.key?('asWKT')
@@ -100,7 +101,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_rich_sections_present_and_empty_without_data
-    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://example.com')
+    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://example.com', user: @viewer)
     # The sections are always present (stable shape) even with no data.
     assert_equal [], doc['journals']
     assert_equal [], doc['relations']
@@ -111,7 +112,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_editable_contract_carries_writable_fields_and_status_transitions
-    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://x')
+    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://x', user: @viewer)
     assert_equal %w[subject description status_id geojson], doc['editable']['fields']
     assert_equal(
       ['New', 'In Progress'],
@@ -120,7 +121,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   end
 
   def test_editable_contract_advertises_delete_and_add_notes_permissions
-    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://x')
+    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://x', user: @viewer)
     assert_equal true, doc['editable']['can_delete']
     assert_equal true, doc['editable']['can_add_notes']
   end
@@ -129,7 +130,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     # A user Redmine forbids from deleting/adding-notes gets false, so the client
     # hides those actions (Redmine still enforces on write).
     issue = fake_issue(deletable: false, notes_addable: false)
-    doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')
+    doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x', user: @viewer)
     assert_equal false, doc['editable']['can_delete']
     assert_equal false, doc['editable']['can_add_notes']
   end
@@ -137,11 +138,11 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   def test_editable_contract_advertises_attachment_add_permission
     # attachments_addable? (add_issue_notes OR edit_issues, Redmine's own attach
     # rule) so a client can gate its upload button without proxying other flags.
-    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://x')
+    doc = RedmineGttSync::IssueDocument.build(fake_issue, base_url: 'https://x', user: @viewer)
     assert_equal true, doc['editable']['can_add_attachments']
 
     issue = fake_issue(attachments_addable: false)
-    doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')
+    doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x', user: @viewer)
     assert_equal false, doc['editable']['can_add_attachments']
   end
 
@@ -162,7 +163,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
       fake_attachment(editable: true, deletable: false, id: 5),
       fake_attachment(editable: false, deletable: false, id: 6)
     ]
-    attachments = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['attachments']
+    attachments = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x', user: @viewer)['attachments']
     assert_equal([true, false], attachments.map { |a| a['editable'] })
     assert_equal([false, false], attachments.map { |a| a['deletable'] })
   end
@@ -173,7 +174,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
       fake_journal(notes: 'Looks fixed', editable: true, id: 1),
       fake_journal(notes: 'Not yours', editable: false, id: 2)
     ]
-    journals = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['journals']
+    journals = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x', user: @viewer)['journals']
     assert_equal([true, false], journals.map { |j| j['notes_editable'] })
     # A false flag must survive .compact (only nil is dropped), so the client can
     # positively know it may NOT edit rather than guessing from a missing key.
@@ -185,7 +186,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     # notes_editable is omitted rather than advertised ambiguously.
     issue = fake_issue
     issue.journals = [fake_journal(notes: nil, editable: true, id: 3)]
-    journal = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['journals'][0]
+    journal = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x', user: @viewer)['journals'][0]
     refute journal.key?('notes_editable')
     refute journal.key?('notes')
   end
@@ -201,7 +202,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
       visible_custom_field_values: [value], editable_custom_field_values: [value]
     )
 
-    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields']
+    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x', user: @viewer)['custom_fields']
     assert_equal 1, cf.size
     assert_equal 5, cf[0]['id']
     assert_equal 'Severity', cf[0]['name']
@@ -223,7 +224,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     issue.project.expects(:issue_categories).never
 
     refs = RedmineGttSync::IssueDocument.build(
-      issue, base_url: 'https://x'
+      issue, base_url: 'https://x', user: @viewer
     )['editable']['references']
     assert_equal [{ 'id' => 8, 'name' => 'Field Worker' }], refs['assigned_to_id']
     assert_equal [{ 'id' => 2, 'name' => 'Normal' }], refs['priority_id']
@@ -241,7 +242,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     IssuePriority.stubs(:active).returns([NamedRef.new(id: 2, name: 'Normal')])
 
     refs = RedmineGttSync::IssueDocument.build(
-      issue, base_url: 'https://x'
+      issue, base_url: 'https://x', user: @viewer
     )['editable']['references']
     assert_equal %w[assigned_to_id priority_id category_id fixed_version_id].sort,
                  refs.keys.sort
@@ -259,7 +260,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     value = CustomValue.new(custom_field: field, custom_field_id: 7, value: '3')
     issue = fake_issue(visible_custom_field_values: [value])
 
-    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields'][0]
+    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x', user: @viewer)['custom_fields'][0]
     assert_equal 'user', cf['field_format']
     assert_equal(
       [{ 'value' => '3', 'label' => 'Alice' }, { 'value' => '5', 'label' => 'Bob' }],
@@ -275,7 +276,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     value = CustomValue.new(custom_field: field, custom_field_id: 5, value: 'High')
     issue = fake_issue(visible_custom_field_values: [value])
 
-    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields'][0]
+    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x', user: @viewer)['custom_fields'][0]
     # list uses possible_values (strings); value_options stays empty.
     assert_equal [], cf['value_options']
     assert_equal %w[Low High], cf['possible_values']
@@ -290,7 +291,7 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
     # editable_custom_field_values is empty (the double's default), so not
     # writable.
     issue = fake_issue(visible_custom_field_values: [value])
-    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')['custom_fields']
+    cf = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x', user: @viewer)['custom_fields']
     assert_equal false, cf[0]['writable']
   end
 
@@ -364,31 +365,27 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
   # -- journals: private-note flag ------------------------------------------
 
   def test_journal_carries_private_notes_flag
-    # The user needs view_private_notes here: the honest private_notes? on the
-    # typed double means the private-note filter actually applies (the old
-    # OpenStruct fake answered nil to the predicate, silently skipping the
-    # filter this assertion depends on).
-    User.stubs(:current).returns(stub(allowed_to?: true))
+    # A user WITH view_private_notes sees the note, and the flag rides along so
+    # the client can mark it.
     journal = JournalDouble.new(id: 7, notes: 'internal only', private_notes: true)
     issue = fake_issue
     issue.journals = [journal]
 
-    journals = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')[
-      'journals'
-    ]
+    journals = RedmineGttSync::IssueDocument.build(
+      issue, base_url: 'https://x', user: stub(allowed_to?: true)
+    )['journals']
     assert_equal true, journals[0]['private_notes']
     assert_equal 'internal only', journals[0]['notes']
   end
 
   def test_private_note_hidden_without_permission_unless_own
     # The flip side of the flag: without view_private_notes another user's
-    # private note is filtered out entirely (the OpenStruct fakes couldn't
-    # exercise this branch - their private_notes? answered nil).
+    # private note is filtered out entirely.
     journal = JournalDouble.new(id: 7, notes: 'internal only', private_notes: true)
     issue = fake_issue
     issue.journals = [journal]
 
-    doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x')
+    doc = RedmineGttSync::IssueDocument.build(issue, base_url: 'https://x', user: @viewer)
     assert_equal [], doc['journals']
   end
 end
