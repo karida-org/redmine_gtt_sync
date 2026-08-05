@@ -80,8 +80,9 @@ All endpoints return JSON and respect the access rules above.
 | `GET /gtt_sync/issues/:id` | A single issue as a JSON-LD document: geometry (GeoJSON + EWKT), journals, relations, attachments, custom fields, and the per-user editing contract. |
 | `GET /gtt_sync/issues?ids=1,2,3` | Batch form of the issue document (up to 100 ids per request), used for offline packaging. |
 | `GET /gtt_sync/projects/:id/schema` | Per-project editing schema: trackers, statuses, custom fields, writable field names, and reference options for the current user. |
+| `GET /gtt_sync/changes?since=<token>` | Delta feed: issues changed since a cursor, so clients resync incrementally. Optional `project_id` narrows the scope; `known_ids=1` adds the full id set for deletion reconciliation. |
 
-Two details matter for client authors:
+A few details matter for client authors:
 
 - **Nothing leaks**: ids the user may not see are omitted (batch) or answered
   with 404 (single), so existence is never revealed.
@@ -90,11 +91,18 @@ Two details matter for client authors:
   disable the rest of its UI. The server still enforces everything on write;
   the flags only prevent a client from offering edits Redmine would reject or
   silently drop.
+- **The change feed is at-least-once, and never loses a change**: pass the
+  `next_since` token from each response into the next request, apply entries
+  idempotently by issue id, and follow `more` until it is false. The first
+  request may pass a plain ISO 8601 time. Very recent changes appear after a
+  short settle delay (about ten seconds), so a slow write can never fall
+  behind the cursor. Deletions are not events in the feed - an issue can also
+  simply leave your visibility - so periodically request `known_ids=1` and
+  drop local issues missing from the returned set.
 
 Planned (tracked in issues): bulk geometry write (#9), geometry-only PATCH
-(#10), a change feed for efficient offline resync (#7), OGC API - Features /
-WFS-T endpoints (#11), server-side export formats (#16), and a paged bundle
-for large issue sets (#35).
+(#10), OGC API - Features / WFS-T endpoints (#11), server-side export formats
+(#16), and a paged bundle for large issue sets (#35).
 
 ## Development
 

@@ -24,7 +24,7 @@ module RedmineGttSync
       query_bundle: :gtt_sync_query_bundle,
       bulk_geometry_write: :gtt_sync_bulk_geometry, # planned: issue #9
       geometry_only_patch: :gtt_sync_geometry, # planned: issue #10
-      change_feed: :gtt_sync_changes, # planned: issue #7
+      change_feed: :gtt_sync_changes,
       schema_introspection: :gtt_sync_project_schema,
       ogc_api_features: :gtt_sync_ogc_features, # planned: issue #11
       wfs_t: :gtt_sync_wfs_transaction # planned: issue #11

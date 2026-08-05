@@ -25,6 +25,7 @@ require_relative 'lib/redmine_gtt_sync/reference_options'
 require_relative 'lib/redmine_gtt_sync/issue_document'
 require_relative 'lib/redmine_gtt_sync/project_bundle'
 require_relative 'lib/redmine_gtt_sync/query_bundle'
+require_relative 'lib/redmine_gtt_sync/change_feed'
 require_relative 'lib/redmine_gtt_sync/project_schema'
 
 # redmine_gtt_sync provides the integration contract that external clients
@@ -54,7 +55,7 @@ Redmine::Plugin.register :redmine_gtt_sync do
   project_module :gtt_sync do
     permission :use_gtt_sync,
                { gtt_sync: %i[project_bundle project_schema issue
-                              issue_documents query_bundle] }
+                              issue_documents query_bundle changes] }
   end
 
   # Which public OAuth application QTask advertises (its client_id) on the
