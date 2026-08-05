@@ -100,9 +100,10 @@ A few details matter for client authors:
   simply leave your visibility - so periodically request `known_ids=1` and
   drop local issues missing from the returned set.
 
-Planned (tracked in issues): bulk geometry write (#9), geometry-only PATCH
-(#10), OGC API - Features / WFS-T endpoints (#11), server-side export formats
-(#16), and a paged bundle for large issue sets (#35).
+Planned (tracked in issues): a read-only OGC API - Features endpoint (#11),
+and - each gated on real-world demand or evidence - a server-side project
+GeoPackage export (#16), a bulk geometry write (#9), and a paged bundle for
+large issue sets (#35).
 
 ## Development
 
