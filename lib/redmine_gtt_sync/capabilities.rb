@@ -44,9 +44,7 @@ module RedmineGttSync
         # Report redmine_gtt's version, not just presence: the base geo surface
         # depends on it, so a client may need to know which release is running.
         requires: { redmine_gtt: gtt_present, redmine_gtt_version: gtt&.version&.to_s },
-        capabilities: base_capabilities(gtt_present)
-                      .merge(contract_capabilities)
-                      .merge(behavior_capabilities),
+        capabilities: base_capabilities(gtt_present).merge(contract_capabilities, behavior_capabilities),
         # The instance's rich-text formatter. A client that renders Markdown
         # itself (QTask) must know whether the instance actually authors in
         # Markdown: on a Textile instance, client-side Markdown rendering would
