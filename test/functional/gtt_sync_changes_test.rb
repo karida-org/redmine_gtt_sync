@@ -102,6 +102,14 @@ class GttSyncChangesTest < ActionController::TestCase
                  scoped['known_ids']
   end
 
+  test 'known_ids is a strict opt-in: 0 and junk stay off' do
+    # Only the documented truthy forms enable the (large) id list, so a
+    # sloppy known_ids=0 cannot amplify the payload by accident.
+    assert_not feed(known_ids: '0').key?('known_ids')
+    assert_not feed(known_ids: 'no').key?('known_ids')
+    assert feed(known_ids: 'true').key?('known_ids')
+  end
+
   test 'a geometry-only save bumps updated_on so the feed can see it' do
     # The feed keys on updated_on, so this pins the redmine_gtt behavior it
     # depends on: writing the geojson safe-attribute is a normal attribute

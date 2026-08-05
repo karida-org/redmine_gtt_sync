@@ -183,7 +183,9 @@ class GttSyncController < ApplicationController
     render json: RedmineGttSync::ChangeFeed.build(
       scope, cursor,
       user: User.current,
-      include_known_ids: params[:known_ids].present?
+      # Strict opt-in: only the documented truthy forms enable the (large)
+      # reconciliation id list; known_ids=0 stays off.
+      include_known_ids: %w[1 true].include?(params[:known_ids].to_s)
     )
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Project not found' }, status: :not_found

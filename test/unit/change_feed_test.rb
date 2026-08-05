@@ -71,7 +71,9 @@ class RedmineGttSyncChangeFeedTest < ActiveSupport::TestCase
   end
 
   def test_unsettled_rows_are_held_back_and_the_cursor_does_not_pass_them
-    Issue.find(1).update_column(:updated_on, Time.current)
+    # A future timestamp is unsettled by construction, so the test cannot
+    # flake by outrunning the settle lag on a slow run.
+    Issue.find(1).update_column(:updated_on, Time.current + 1.hour)
     scope = Issue.where(id: 1)
 
     feed = RedmineGttSync::ChangeFeed.build(scope, epoch_cursor, user: User.find(1))
