@@ -40,6 +40,6 @@ class GttSyncConnectController < ApplicationController
   end
 
   def canonical_base_url
-    "#{Setting.protocol}://#{Setting.host_name}"
+    RedmineGttSync.canonical_base_url
   end
 end

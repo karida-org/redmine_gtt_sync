@@ -235,6 +235,6 @@ class GttSyncController < ApplicationController
   # The instance's canonical origin (not the request host), so IRIs are stable
   # regardless of how the request arrived.
   def canonical_base_url
-    "#{Setting.protocol}://#{Setting.host_name}"
+    RedmineGttSync.canonical_base_url
   end
 end

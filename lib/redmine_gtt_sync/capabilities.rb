@@ -73,10 +73,9 @@ module RedmineGttSync
     end
 
     # The instance's canonical origin (Setting, not request host) so advertised
-    # OAuth endpoints are stable regardless of how the probe was reached. Named
-    # to match the controller's canonical_base_url so the concept stays one.
+    # OAuth endpoints are stable regardless of how the probe was reached.
     def canonical_base_url
-      "#{Setting.protocol}://#{Setting.host_name}"
+      RedmineGttSync.canonical_base_url
     end
 
     # client_id of the admin-selected OAuth application, or nil. Only public

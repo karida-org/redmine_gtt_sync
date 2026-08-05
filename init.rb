@@ -15,6 +15,7 @@ require 'redmine'
 # oauth2_applications_controller.rb are different basenames and unaffected.
 Rails.autoloaders.main.inflector.inflect('oauth' => 'OAuth')
 
+require_relative 'lib/redmine_gtt_sync'
 require_relative 'lib/redmine_gtt_sync/oauth'
 require_relative 'lib/redmine_gtt_sync/capabilities'
 require_relative 'lib/redmine_gtt_sync/geometry'
