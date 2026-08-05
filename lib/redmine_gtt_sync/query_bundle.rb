@@ -16,8 +16,9 @@ module RedmineGttSync
   module QueryBundle
     module_function
 
-    # +issues+ must already be visibility- and use_gtt_sync-scoped.
-    def build(issues, base_url:)
+    # +issues+ must already be visibility- and use_gtt_sync-scoped; +user+ is
+    # the acting user the per-feature editable flag is resolved for.
+    def build(issues, base_url:, user:)
       base = base_url.to_s.chomp('/')
       grouped = { 'point' => [], 'line' => [], 'polygon' => [] }
       unplaced = []
@@ -26,9 +27,9 @@ module RedmineGttSync
         geojson = issue.geom && Geometry.to_geojson(issue.geom)
         category = geojson && ProjectBundle::GEOMETRY_CATEGORY[geojson['type']]
         if category
-          grouped[category] << ProjectBundle.feature(issue, geojson)
+          grouped[category] << ProjectBundle.feature(issue, geojson, user)
         else
-          unplaced << ProjectBundle.summary(issue)
+          unplaced << ProjectBundle.summary(issue, user)
         end
       end
 

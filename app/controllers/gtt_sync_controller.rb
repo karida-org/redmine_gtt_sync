@@ -29,8 +29,9 @@ class GttSyncController < ApplicationController
     return unless integration_allowed?(issue.project)
 
     # Serve as JSON-LD so clients/intermediaries interpret the @context/@id.
-    render json: RedmineGttSync::IssueDocument.build(issue, base_url: canonical_base_url),
-           content_type: 'application/ld+json'
+    render json: RedmineGttSync::IssueDocument.build(
+      issue, base_url: canonical_base_url, user: User.current
+    ), content_type: 'application/ld+json'
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Issue not found' }, status: :not_found
   end
@@ -74,8 +75,11 @@ class GttSyncController < ApplicationController
     issues = Issue.visible.where(id: ids.uniq, project_id: gtt_sync_project_ids).to_a
     preload_document_associations(issues)
     base = canonical_base_url
+    user = User.current
     render json: {
-      'issues' => issues.map { |issue| RedmineGttSync::IssueDocument.build(issue, base_url: base) }
+      'issues' => issues.map do |issue|
+        RedmineGttSync::IssueDocument.build(issue, base_url: base, user: user)
+      end
     }
   end
 
@@ -109,7 +113,7 @@ class GttSyncController < ApplicationController
     end
     preload_issue_associations(issues)
     render json: RedmineGttSync::ProjectBundle.build(
-      project, issues, base_url: canonical_base_url
+      project, issues, base_url: canonical_base_url, user: User.current
     )
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Project or query not found' }, status: :not_found
@@ -146,7 +150,9 @@ class GttSyncController < ApplicationController
         Issue.visible.where(project_id: gtt_sync_project_ids).to_a
       end
     preload_issue_associations(issues)
-    render json: RedmineGttSync::QueryBundle.build(issues, base_url: canonical_base_url)
+    render json: RedmineGttSync::QueryBundle.build(
+      issues, base_url: canonical_base_url, user: User.current
+    )
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Query not found' }, status: :not_found
   end

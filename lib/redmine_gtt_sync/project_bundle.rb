@@ -8,8 +8,9 @@ module RedmineGttSync
   # that issues.geojson omits (for the set-geometry-later workflow).
   #
   # This module only SHAPES records; the controller is responsible for passing
-  # already permission-scoped inputs (Project.visible / Issue.visible), so the
-  # endpoint never widens what the user can see.
+  # already permission-scoped inputs (Project.visible / Issue.visible) and the
+  # acting user, so the endpoint never widens what the user can see and the
+  # module reads no hidden global state.
   module ProjectBundle
     GEOMETRY_CATEGORY = {
       'Point' => 'point', 'MultiPoint' => 'point',
@@ -19,8 +20,9 @@ module RedmineGttSync
 
     module_function
 
-    # +issues+ must already be visibility-scoped (e.g. project.issues.visible).
-    def build(project, issues, base_url:)
+    # +issues+ must already be visibility-scoped (e.g. project.issues.visible);
+    # +user+ is the acting user the per-feature editable flag is resolved for.
+    def build(project, issues, base_url:, user:)
       base = base_url.to_s.chomp('/')
       grouped = { 'point' => [], 'line' => [], 'polygon' => [] }
       unplaced = []
@@ -29,9 +31,9 @@ module RedmineGttSync
         geojson = issue.geom && Geometry.to_geojson(issue.geom)
         category = geojson && GEOMETRY_CATEGORY[geojson['type']]
         if category
-          grouped[category] << feature(issue, geojson)
+          grouped[category] << feature(issue, geojson, user)
         else
-          unplaced << summary(issue)
+          unplaced << summary(issue, user)
         end
       end
 
@@ -46,12 +48,12 @@ module RedmineGttSync
       }
     end
 
-    def feature(issue, geojson)
+    def feature(issue, geojson, user)
       {
         'type' => 'Feature',
         'id' => issue.id,
         'geometry' => geojson,
-        'properties' => summary(issue)
+        'properties' => summary(issue, user)
       }
     end
 
@@ -75,7 +77,7 @@ module RedmineGttSync
     # leaves those columns blank. The reference associations are preloaded in the
     # controller (preload_issue_associations) to keep a large bundle from fanning
     # out into per-issue N+1 lookups.
-    def summary(issue)
+    def summary(issue, user)
       {
         'id' => issue.id,
         'project_id' => issue.project_id,
@@ -93,13 +95,13 @@ module RedmineGttSync
         'created_on' => issue.created_on&.iso8601,
         'updated_on' => issue.updated_on&.iso8601,
         'lock_version' => issue.lock_version,
-        # Whether the CURRENT user may edit this issue's attributes (geometry and
+        # Whether the acting user may edit this issue's attributes (geometry and
         # status included) - attributes_editable?, not editable?, which also ORs
         # notes-addable. Persisted per feature so a client can fail closed on
         # map-side editing instead of offering writes Redmine will reject.
         # Redmine memoizes roles per (user, project), so this stays cheap across
         # a large bundle.
-        'editable' => issue.attributes_editable?(User.current),
+        'editable' => issue.attributes_editable?(user),
         'custom_fields' => CustomFields.values(issue)
       }
     end

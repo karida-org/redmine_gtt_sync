@@ -7,9 +7,9 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
   include RedmineGttSync::TestDoubles
 
   setup do
-    # summary() reads User.current for the per-feature editable flag; the fake
+    # The acting user the per-feature editable flag is resolved for; the fake
     # issues answer attributes_editable? themselves, so any user object works.
-    User.stubs(:current).returns(stub)
+    @viewer = stub
   end
 
   def factory
@@ -56,7 +56,8 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
 
   def build(issues, with_boundary: true)
     RedmineGttSync::ProjectBundle.build(
-      project(with_boundary: with_boundary), issues, base_url: 'https://example.com/'
+      project(with_boundary: with_boundary), issues,
+      base_url: 'https://example.com/', user: @viewer
     )
   end
 
