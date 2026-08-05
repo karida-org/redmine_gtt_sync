@@ -94,10 +94,16 @@ class GttSyncController < ApplicationController
     # without it the whole project loads. Both query.issues and
     # project.issues.visible are view_issues-scoped, so visibility holds either
     # way. use_gtt_sync + view_issues for this single project were checked above.
+    #
+    # A project-scoped query can span the project's subtree (Redmine includes
+    # subprojects when display_subprojects_issues is on, or when the query says
+    # so), so the per-project use_gtt_sync gate is applied to the result - a
+    # subproject that never enabled the integration must not ride in through
+    # its parent's bundle.
     if params[:query_id].present?
       query = IssueQuery.visible.find(params[:query_id])
       query.project = project
-      issues = query.issues
+      issues = filter_issues_by_gtt_sync(query.issues)
     else
       issues = project.issues.visible.to_a
     end
@@ -150,8 +156,10 @@ class GttSyncController < ApplicationController
   # Ids of projects where the current user may use the integration
   # (use_gtt_sync is project-scoped, and Project.allowed_to already factors in
   # module enablement + role, so even an admin only gets module-enabled ones).
+  # Not memoized: each action needs it at most once, and cached ids would go
+  # stale within a request lifecycle that changes memberships (tests do).
   def gtt_sync_project_ids
-    @gtt_sync_project_ids ||= Project.allowed_to(User.current, :use_gtt_sync).ids
+    Project.allowed_to(User.current, :use_gtt_sync).ids
   end
 
   # Keep to issues in gtt_sync-enabled projects, matching on project_id (no

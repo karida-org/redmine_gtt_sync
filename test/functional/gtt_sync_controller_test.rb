@@ -25,6 +25,14 @@ class GttSyncControllerTest < ActionController::TestCase
     geometry + json['issues']['unplaced'].size
   end
 
+  # All issue ids in a bundle, spatial and unplaced alike.
+  def issue_ids(json)
+    spatial = %w[point line polygon].flat_map do |kind|
+      json['issues'][kind]['features'].map { |feature| feature['id'] }
+    end
+    spatial + json['issues']['unplaced'].map { |issue| issue['id'] }
+  end
+
   test 'resolves a project by identifier' do
     @request.session[:user_id] = 1
     get :project_bundle, params: { id: 'ecookbook' }
@@ -62,6 +70,30 @@ class GttSyncControllerTest < ActionController::TestCase
     get :project_bundle, params: { id: 'ecookbook', query_id: query.id }
     assert_response :success
     assert_equal 0, issue_count(JSON.parse(response.body))
+  end
+
+  test 'project_bundle query path gates subproject issues on the integration' do
+    # A project-scoped query spans the subtree when display_subprojects_issues
+    # is on (the Redmine default). Issue 5 lives in project 3, a subproject of
+    # eCookbook that never enabled the gtt_sync module, so it must not ride in
+    # through its parent's bundle.
+    @request.session[:user_id] = 1
+    query = IssueQuery.create!(
+      name: 'match all', user: User.find(1), visibility: Query::VISIBILITY_PUBLIC
+    )
+    with_settings display_subprojects_issues: '1' do
+      get :project_bundle, params: { id: 'ecookbook', query_id: query.id }
+      assert_response :success
+      ids = issue_ids(JSON.parse(response.body))
+      assert_includes ids, 1, 'parent-project issue expected'
+      assert_not_includes ids, 5, 'subproject without the module must be gated'
+
+      # Once the subproject opts in, its issues are included again.
+      subproject = Project.find(3)
+      subproject.enabled_module_names = subproject.enabled_module_names | ['gtt_sync']
+      get :project_bundle, params: { id: 'ecookbook', query_id: query.id }
+      assert_includes issue_ids(JSON.parse(response.body)), 5
+    end
   end
 
   test 'project_bundle with an unknown query is 404' do
