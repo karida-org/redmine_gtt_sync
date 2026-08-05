@@ -22,12 +22,18 @@ module RedmineGttSync
       issue_documents_batch: :gtt_sync_issue_documents,
       project_bundle: :gtt_sync_project_bundle,
       query_bundle: :gtt_sync_query_bundle,
-      bulk_geometry_write: :gtt_sync_bulk_geometry, # planned: issue #9
-      geometry_only_patch: :gtt_sync_geometry, # planned: issue #10
+      bulk_geometry_write: :gtt_sync_bulk_geometry, # evidence-gated: issue #9
+      # Closed as obsolete (#10): a sparse PUT with lock_version already is a
+      # geometry-only write. The flag stays advertised (false) so old clients
+      # that probe it keep getting an honest answer.
+      geometry_only_patch: :gtt_sync_geometry,
       change_feed: :gtt_sync_changes,
       schema_introspection: :gtt_sync_project_schema,
-      ogc_api_features: :gtt_sync_ogc_features, # planned: issue #11
-      wfs_t: :gtt_sync_wfs_transaction # planned: issue #11
+      ogc_api_features: :gtt_sync_ogc_features, # planned: issue #11 (read-only)
+      # Not planned (dropped from #11): legacy XML transactions nobody in this
+      # ecosystem asks for; standards writes would be OGC API Part 4 instead.
+      # The flag stays advertised (false) for honest feature detection.
+      wfs_t: :gtt_sync_wfs_transaction
     }.freeze
 
     module_function
