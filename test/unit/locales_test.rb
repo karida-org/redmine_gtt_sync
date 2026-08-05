@@ -6,7 +6,7 @@ class RedmineGttSyncLocalesTest < ActiveSupport::TestCase
   LOCALE_DIR = File.expand_path('../../config/locales', __dir__)
 
   def locale_keys(locale)
-    YAML.load_file(File.join(LOCALE_DIR, "#{locale}.yml")).fetch(locale).keys.sort
+    YAML.safe_load_file(File.join(LOCALE_DIR, "#{locale}.yml")).fetch(locale).keys.sort
   end
 
   def test_en_and_ja_define_the_same_keys
