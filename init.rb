@@ -47,9 +47,14 @@ Redmine::Plugin.register :redmine_gtt_sync do
   # Redmine's own view/edit_issues (reading/writing still need those); it never
   # widens access. No `require:` so an admin may grant it to any role (including
   # Non member / Anonymous) for public integration if desired.
+  # The action map lists every gated endpoint (capabilities stays out: it is
+  # the public probe). The controller checks the permission itself, but the map
+  # must stay truthful for permission reports and a possible move to the stock
+  # authorize filter.
   project_module :gtt_sync do
     permission :use_gtt_sync,
-               { gtt_sync: %i[project_bundle project_schema issue query_bundle] }
+               { gtt_sync: %i[project_bundle project_schema issue
+                              issue_documents query_bundle] }
   end
 
   # Which public OAuth application QTask advertises (its client_id) on the
