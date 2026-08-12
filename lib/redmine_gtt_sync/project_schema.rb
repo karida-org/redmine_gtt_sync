@@ -31,7 +31,11 @@ module RedmineGttSync
         'statuses' => IssueStatus.sorted.map do |s|
           { 'id' => s.id, 'name' => s.name, 'is_closed' => s.is_closed }
         end,
-        'custom_fields' => custom_fields(project, user)
+        'custom_fields' => custom_fields(project, user),
+        # Whether and how this user may log time here (issue #89): the
+        # permission, the project's activity list, time-entry custom fields,
+        # and the safe attribute names a create may carry.
+        'time_entry' => TimeEntries.schema_section(project, user)
       }.merge(writable_and_references(project, user))
     end
 

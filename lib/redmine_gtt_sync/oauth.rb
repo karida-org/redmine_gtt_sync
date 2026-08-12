@@ -31,6 +31,9 @@ module RedmineGttSync
     #   edit_issue_notes/edit_own_issue_notes for editing or clearing
     #   (= deleting) a note via the stock PUT /journals/:id write.
     # - delete_issues gates issue deletion.
+    # - view_time_entries gates the own-entries index and log_time gates the
+    #   time-entry create; over OAuth both apply on top of the user's role,
+    #   like every other scope here (#89).
     # Every scope here maps to a real Redmine permission (Doorkeeper scopes =
     # AccessControl.permissions). Adding a scope widens the OAuth app and the
     # advertised list; existing connections re-authorize on scope drift.
@@ -48,6 +51,8 @@ module RedmineGttSync
       edit_own_issue_notes
       view_private_notes
       set_notes_private
+      view_time_entries
+      log_time
       view_gtt_settings
       use_gtt_sync
     ].freeze
