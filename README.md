@@ -60,7 +60,17 @@ integration contract on top:
    This creates a public PKCE OAuth application (no secret involved) and
    advertises its client id on the capabilities probe. The button is safe to
    click again later; it re-checks and repairs the settings.
-4. **Point users at the Connect page**: the *Connect* item in the top menu
+4. **Turn on mobile sign-in (optional)**: on the same settings screen, click
+   *Set up the mobile app connection*. This provisions a second public PKCE
+   application with a custom-scheme redirect (`georeport://oauth/callback`)
+   for the Georeport mobile app and advertises it on the capabilities probe
+   under `oauth.clients.mobile`. The application record stays the source of
+   truth: an admin who needs a different or additional redirect can edit the
+   application, and the probe advertises what the record holds. Note that
+   clicking a set-up button again reconciles the managed application back to
+   the plugin defaults, including its redirect list, so re-apply custom
+   redirects after a repair run.
+5. **Point users at the Connect page**: the *Connect* item in the top menu
    (visible to users who hold the permission somewhere) shows the instance
    URL, client id, and scopes, and serves a downloadable QGIS OAuth2 config.
 
@@ -74,7 +84,7 @@ All endpoints return JSON and respect the access rules above.
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /gtt_sync/capabilities` | Public feature-detection probe: plugin/Redmine versions, per-endpoint flags, text formatting, OAuth parameters. |
+| `GET /gtt_sync/capabilities` | Public feature-detection probe: plugin/Redmine versions, per-endpoint flags, text formatting, OAuth parameters. The `oauth.clients` map carries one entry per advertised application kind (`desktop`, `mobile`), each with its `client_id`, `redirect_uris`, and granted `scopes`; the top-level `client_id`/`scopes` mirror the desktop entry for released QTask versions. |
 | `GET /gtt_sync/projects/:id/bundle` | One optimized payload for a project: issues split by geometry type, geometry-less ("unplaced") issues, and the project boundary. Optional `query_id` applies a saved query's filters. |
 | `GET /gtt_sync/bundle?query_id=N` | The same payload across all projects the user may integrate with; `query_id` is optional here too. |
 | `GET /gtt_sync/issues/:id` | A single issue as a JSON-LD document: geometry (GeoJSON + EWKT), journals, relations, attachments, custom fields, and the per-user editing contract. |

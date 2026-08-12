@@ -61,7 +61,9 @@ module RedmineGttSync
         # always, plus the client_id only when an admin selected a public app to
         # advertise (see advertised_oauth_client_id); never a client secret.
         oauth: RedmineGttSync::OAuth.advertisement(
-          canonical_base_url, client_id: advertised_oauth_client_id
+          canonical_base_url,
+          client_id: advertised_oauth_client_id,
+          mobile_client_id: advertised_mobile_oauth_client_id
         )
       }
     end
@@ -88,7 +90,16 @@ module RedmineGttSync
     # no longer resolves to a public app (deleted, or flipped to confidential)
     # advertises nothing rather than leaking.
     def advertised_oauth_client_id
-      uid = Setting.plugin_redmine_gtt_sync['oauth_application_uid'].presence
+      advertised_public_application_uid('oauth_application_uid')
+    end
+
+    # Same rules for the mobile app selection.
+    def advertised_mobile_oauth_client_id
+      advertised_public_application_uid('oauth_mobile_application_uid')
+    end
+
+    def advertised_public_application_uid(setting_key)
+      uid = Setting.plugin_redmine_gtt_sync[setting_key].presence
       return nil unless uid
 
       Doorkeeper::Application.where(confidential: false).find_by(uid: uid)&.uid

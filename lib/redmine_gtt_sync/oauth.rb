@@ -57,6 +57,15 @@ module RedmineGttSync
     QTASK_APP_NAME = 'QTask'
     QTASK_REDIRECT_URI = 'http://127.0.0.1:7070/'
 
+    # The managed public client the Georeport mobile app uses: Authorization
+    # Code + PKCE with a custom-scheme redirect (a phone cannot listen on a
+    # loopback port the way a desktop can), no client secret. The provisioned
+    # app record stays the source of truth: an admin who needs a different or
+    # additional redirect (for example an app-link URL) can edit the
+    # application, and the probe advertises whatever the record holds.
+    MOBILE_APP_NAME = 'Georeport'
+    MOBILE_REDIRECT_URI = 'georeport://oauth/callback'
+
     module_function
 
     # Create or reconcile the public QTask OAuth application and return it, so an
@@ -65,9 +74,19 @@ module RedmineGttSync
     # redirect + scopes brought back in line (this is also how the scope list
     # stays current as it grows); never touches a confidential app of that name.
     def ensure_qtask_application
+      ensure_public_application(QTASK_APP_NAME, QTASK_REDIRECT_URI)
+    end
+
+    # The mobile counterpart of ensure_qtask_application, with the same
+    # idempotent reconcile semantics.
+    def ensure_mobile_application
+      ensure_public_application(MOBILE_APP_NAME, MOBILE_REDIRECT_URI)
+    end
+
+    def ensure_public_application(name, redirect_uri)
       app = Doorkeeper::Application.where(confidential: false)
-                                   .find_or_initialize_by(name: QTASK_APP_NAME)
-      app.redirect_uri = QTASK_REDIRECT_URI
+                                   .find_or_initialize_by(name: name)
+      app.redirect_uri = redirect_uri
       app.scopes = SCOPES.join(' ')
       app.confidential = false
       app.save!
@@ -117,14 +136,42 @@ module RedmineGttSync
     # included only when an admin has selected a public app to advertise (a
     # public PKCE client_id is not a secret); omitted otherwise so a client
     # falls back to asking the user for it.
-    def advertisement(base_url, client_id: nil)
+    #
+    # The top-level ``client_id`` and ``scopes`` describe the desktop (QTask)
+    # app and predate multi-client advertisement; released QTask versions read
+    # them, so they stay. New clients should read ``clients`` instead: one
+    # entry per advertised app kind, each carrying its client_id, the redirect
+    # URIs from the app record, and the scopes that app actually grants.
+    def advertisement(base_url, client_id: nil, mobile_client_id: nil)
       ad = {
         authorize_url: authorize_url(base_url),
         token_url: token_url(base_url),
         scopes: advertised_scopes(client_id)
       }
       ad[:client_id] = client_id if client_id.present?
+      clients = {
+        desktop: client_entry(client_id),
+        mobile: client_entry(mobile_client_id)
+      }.compact
+      ad[:clients] = clients if clients.any?
       ad
+    end
+
+    # A per-client advertisement entry, resolved from the application record so
+    # admin customizations (extra redirect URIs, a narrowed scope allowlist)
+    # are exactly what clients see. Public apps only; anything else is omitted.
+    def client_entry(uid)
+      return nil if uid.blank?
+
+      app = Doorkeeper::Application.where(confidential: false).find_by(uid: uid)
+      return nil unless app
+
+      {
+        client_id: app.uid,
+        # Doorkeeper stores multiple redirect URIs whitespace-separated.
+        redirect_uris: app.redirect_uri.to_s.split,
+        scopes: SCOPES & app.scopes.to_a.map(&:to_s)
+      }
     end
 
     # Split the QTask scope set against a managed app's allowlist:

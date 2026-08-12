@@ -2,11 +2,6 @@
   # Only public (non-confidential) apps are eligible: a public PKCE client_id is
   # not a secret and is safe to advertise; a confidential client's id must not be.
   public_apps = Doorkeeper::Application.where(confidential: false).order(:name)
-  selected = @settings['oauth_application_uid']
-  # The selected app (if any) is the source of truth for whether the connection
-  # is on and what QTask may do; computed once and reused for the status line and
-  # the scope breakdown below.
-  selected_app = public_apps.detect { |app| app.uid == selected } if selected.present?
 %>
 
 <%# Redmine renders this partial inside its own `.box.tabular` wrapper, which
@@ -17,6 +12,7 @@
     tall, multi-line field instead of floating against its middle. %>
 <style>
   .plugin-redmine_gtt_sync .gtt-sync-intro { margin: 0 0 1.2em; }
+  .plugin-redmine_gtt_sync .gtt-sync-section-heading { margin: 1.2em 0 0.6em; }
   /* Redmine's `#content .tabular label` rule adds a top margin to centre the
      label against input boxes; its ID scope outranks a class selector, so match
      that scope here to reset it and top-align each label with its field. */
@@ -32,57 +28,53 @@
   <div class="warning gtt-sync-intro"><%= l(:text_gtt_sync_textile_warning) %></div>
 <% end %>
 
-<p>
-  <label><%= l(:label_gtt_sync_oauth_status) %></label>
-  <% if selected_app %>
-    <span class="icon icon-ok"><%= l(:text_gtt_sync_oauth_status_ready) %></span>
-  <% else %>
-    <span class="icon icon-warning"><%= l(:text_gtt_sync_oauth_status_off) %></span>
-  <% end %>
-</p>
+<h4 class="gtt-sync-section-heading"><%= l(:label_gtt_sync_oauth_section_desktop) %></h4>
+<%= render partial: 'settings/gtt_sync_oauth_section',
+           locals: {
+             public_apps: public_apps,
+             settings: @settings,
+             section: {
+               setting_key: 'oauth_application_uid',
+               create_path: gtt_sync_create_oauth_application_path,
+               status_label: :label_gtt_sync_oauth_status,
+               status_ready: :text_gtt_sync_oauth_status_ready,
+               status_off: :text_gtt_sync_oauth_status_off,
+               select_label: :label_gtt_sync_oauth_application,
+               select_hint: :text_gtt_sync_oauth_application_hint,
+               button_label: :button_gtt_sync_create_oauth_application,
+               button_hint: :text_gtt_sync_create_oauth_application_hint,
+               scope_label: :label_gtt_sync_oauth_scope_status,
+               scopes_granted: :text_gtt_sync_oauth_scopes_granted,
+               scopes_ungranted: :text_gtt_sync_oauth_scopes_ungranted,
+               redirect_mismatch_warning: :text_gtt_sync_oauth_redirect_mismatch,
+               expected_redirect_pattern: %r{\Ahttp://127\.0\.0\.1}
+             }
+           } %>
 
-<p>
-  <label for="settings_oauth_application_uid"><%= l(:label_gtt_sync_oauth_application) %></label>
-  <%= select_tag 'settings[oauth_application_uid]',
-        options_for_select(
-          [[l(:label_gtt_sync_oauth_application_none), '']] +
-            public_apps.map { |app| [app.name, app.uid] },
-          selected
-        ),
-        id: 'settings_oauth_application_uid' %>
-  <em class="info"><%= l(:text_gtt_sync_oauth_application_hint) %></em>
-</p>
+<h4 class="gtt-sync-section-heading"><%= l(:label_gtt_sync_oauth_section_mobile) %></h4>
+<div class="gtt-sync-intro"><%= l(:text_gtt_sync_mobile_oauth_intro) %></div>
+<%= render partial: 'settings/gtt_sync_oauth_section',
+           locals: {
+             public_apps: public_apps,
+             settings: @settings,
+             section: {
+               setting_key: 'oauth_mobile_application_uid',
+               create_path: gtt_sync_create_mobile_oauth_application_path,
+               status_label: :label_gtt_sync_mobile_oauth_status,
+               status_ready: :text_gtt_sync_mobile_oauth_status_ready,
+               status_off: :text_gtt_sync_mobile_oauth_status_off,
+               select_label: :label_gtt_sync_mobile_oauth_application,
+               select_hint: :text_gtt_sync_mobile_oauth_application_hint,
+               button_label: :button_gtt_sync_create_mobile_oauth_application,
+               button_hint: :text_gtt_sync_create_mobile_oauth_application_hint,
+               scope_label: :label_gtt_sync_mobile_oauth_scope_status,
+               scopes_granted: :text_gtt_sync_mobile_oauth_scopes_granted,
+               scopes_ungranted: :text_gtt_sync_mobile_oauth_scopes_ungranted,
+               redirect_mismatch_warning: :text_gtt_sync_mobile_oauth_redirect_mismatch,
+               expected_redirect_pattern: %r{\A(georeport://|https://)}
+             }
+           } %>
 
 <% if public_apps.empty? %>
   <p><em class="info"><%= l(:text_gtt_sync_oauth_no_public_apps) %></em></p>
-<% end %>
-
-<p>
-  <%# An <a> (not a nested form) so it is valid inside the settings form; UJS
-      turns method: :post into a CSRF-protected POST. %>
-  <%= link_to l(:button_gtt_sync_create_oauth_application),
-              gtt_sync_create_oauth_application_path,
-              method: :post, class: 'icon icon-add' %>
-  <em class="info"><%= l(:text_gtt_sync_create_oauth_application_hint) %></em>
-</p>
-
-<%
-  # The selected app's allowlist is the source of truth for what QTask may do:
-  # show which of QTask's actions it allows so an admin sees the effect of
-  # narrowing/expanding it (features gate off when a permission isn't allowed).
-  # The Set-up/reconcile button above restores the full recommended set.
-%>
-<% if selected_app %>
-  <% status = RedmineGttSync::OAuth.scope_status(selected_app.uid) %>
-  <p>
-    <label><%= l(:label_gtt_sync_oauth_scope_status) %></label>
-    <span><%= l(:text_gtt_sync_oauth_scopes_granted,
-                count: status[:granted].size,
-                total: RedmineGttSync::OAuth::SCOPES.size) %></span>
-    <% if status[:ungranted].any? %>
-      <br />
-      <em class="info"><%= l(:text_gtt_sync_oauth_scopes_ungranted,
-                             scopes: status[:ungranted].join(', ')) %></em>
-    <% end %>
-  </p>
 <% end %>

@@ -156,11 +156,46 @@ class RedmineGttSyncCapabilitiesTest < ActiveSupport::TestCase
     end
   end
 
+  def test_advertises_the_selected_mobile_app_under_clients
+    app = Doorkeeper::Application.create!(
+      name: 'GeoreportTest', redirect_uri: 'georeport://oauth/callback',
+      scopes: RedmineGttSync::OAuth::SCOPES.join(' '), confidential: false
+    )
+    with_gtt_sync_settings('oauth_mobile_application_uid' => app.uid) do
+      oauth = RedmineGttSync::Capabilities.report[:oauth]
+      # Mobile-only advertisement: no top-level client_id (that is the desktop
+      # app), but a mobile clients entry with the record's redirect.
+      refute oauth.key?(:client_id)
+      assert_equal app.uid, oauth[:clients][:mobile][:client_id]
+      assert_equal ['georeport://oauth/callback'],
+                   oauth[:clients][:mobile][:redirect_uris]
+      refute oauth[:clients].key?(:desktop)
+    end
+  ensure
+    app&.destroy
+  end
+
+  def test_never_advertises_a_confidential_mobile_app
+    app = Doorkeeper::Application.create!(
+      name: 'GeoreportConfidential', redirect_uri: 'georeport://oauth/callback',
+      scopes: RedmineGttSync::OAuth::SCOPES.join(' '), confidential: true
+    )
+    with_gtt_sync_settings('oauth_mobile_application_uid' => app.uid) do
+      refute RedmineGttSync::Capabilities.report[:oauth].key?(:clients)
+    end
+  ensure
+    app&.destroy
+  end
+
   private
 
-  def with_gtt_sync_oauth_app(uid)
+  def with_gtt_sync_oauth_app(uid, &block)
+    with_gtt_sync_settings({ 'oauth_application_uid' => uid }, &block)
+  end
+
+  def with_gtt_sync_settings(overrides)
     previous = Setting.plugin_redmine_gtt_sync
-    Setting.plugin_redmine_gtt_sync = previous.merge('oauth_application_uid' => uid)
+    Setting.plugin_redmine_gtt_sync = previous.merge(overrides)
     yield
   ensure
     Setting.plugin_redmine_gtt_sync = previous
