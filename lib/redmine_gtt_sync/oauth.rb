@@ -55,6 +55,7 @@ module RedmineGttSync
       log_time
       view_gtt_settings
       use_gtt_sync
+      view_user_locations
     ].freeze
 
     # The managed public client QTask uses: Authorization Code + PKCE, loopback
