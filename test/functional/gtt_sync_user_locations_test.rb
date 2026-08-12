@@ -10,9 +10,8 @@ require_relative '../../app/controllers/gtt_sync_controller'
 #
 # Fixture cast: project 1 (eCookbook, public), user 2 (jsmith, member via
 # role 1), user 3 (dlopper, member of project 1 via role 2).
-# Tests arrange geometry columns directly; that is fixture setup, not
-# application behavior worth validating.
-# rubocop:disable Rails/SkipsModelValidations
+# Tests arrange geometry columns directly (update_columns); that is fixture
+# setup, not application behavior worth validating.
 class GttSyncUserLocationsTest < ActionController::TestCase
   tests GttSyncController
 
@@ -207,4 +206,3 @@ class GttSyncUserLocationsTest < ActionController::TestCase
     assert_nil extract.call(nil)
   end
 end
-# rubocop:enable Rails/SkipsModelValidations

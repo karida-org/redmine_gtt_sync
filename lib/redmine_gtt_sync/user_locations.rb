@@ -60,12 +60,10 @@ module RedmineGttSync
       # is a high-frequency field update that must not touch updated_on, fire
       # profile callbacks, or fail on validations unrelated to a coordinate
       # (a half-complete profile must not silently stop location sharing).
-      # rubocop:disable Rails/SkipsModelValidations
       user.update_columns(
         geom: "SRID=4326;POINT(#{lon} #{lat})",
         geom_updated_on: Time.current
       )
-      # rubocop:enable Rails/SkipsModelValidations
       [true, nil]
     end
 
