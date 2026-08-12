@@ -224,7 +224,7 @@ class GttSyncController < ApplicationController
 
       scope = scope.where(project: project)
     else
-      scope = scope.where(project_id: gtt_sync_project_ids)
+      scope = scope.where(project_id: time_entry_project_ids)
     end
     scope = scope.where(issue_id: params[:issue_id]) if params[:issue_id].present?
     scope = scope.where(spent_on: from..) if from
@@ -287,6 +287,15 @@ class GttSyncController < ApplicationController
       error: "#{key} must be an ISO 8601 date (YYYY-MM-DD)"
     }, status: :bad_request
     nil
+  end
+
+  # The unscoped time-entry index needs BOTH integration_allowed? gates pushed
+  # into the query: TimeEntry.visible enforces view_time_entries (not
+  # view_issues), while the serialized entries carry issue subjects - so
+  # without the view_issues intersection, the unscoped branch would hand out
+  # issue data the project_id branch correctly refuses with a 403.
+  def time_entry_project_ids
+    gtt_sync_project_ids & Project.allowed_to(User.current, :view_issues).ids
   end
 
   # Ids of projects where the current user may use the integration

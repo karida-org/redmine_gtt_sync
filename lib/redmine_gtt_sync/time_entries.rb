@@ -32,7 +32,8 @@ module RedmineGttSync
     # filtered scope, so the summary stays correct even when the list is
     # truncated at the cap.
     def index(scope, limit:, user: User.current)
-      entries = scope.includes(:project, :issue, :activity, :custom_values)
+      entries = scope.includes(:project, :issue, :activity,
+                               custom_values: :custom_field)
                      .order(spent_on: :desc, id: :desc)
                      .limit(limit)
                      .to_a

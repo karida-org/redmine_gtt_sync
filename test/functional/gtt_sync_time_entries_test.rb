@@ -84,7 +84,7 @@ class GttSyncTimeEntriesTest < ActionController::TestCase
   end
 
   test 'refuses without the log_time permission' do
-    grant() # view_issues + use_gtt_sync only
+    grant # view_issues + use_gtt_sync only
     assert_no_difference 'TimeEntry.count' do
       post :create_time_entry, params: { id: 1, hours: 1, activity_id: activity_id }
     end
@@ -168,6 +168,73 @@ class GttSyncTimeEntriesTest < ActionController::TestCase
                       spent_on: Date.new(2026, 8, 10), activity_id: activity_id)
     project = Project.find(1)
     project.enabled_module_names = project.enabled_module_names - ['gtt_sync']
+
+    get :time_entries, params: {}
+    assert_response :success
+    assert_equal 0, JSON.parse(response.body)['total_count']
+  end
+
+  test 'totals cover the whole scope even when the list is capped' do
+    grant(:log_time, :view_time_entries)
+    limit = GttSyncController::TIME_ENTRIES_LIMIT
+    base = {
+      project_id: 1, user_id: 2, author_id: 2, hours: 1.0,
+      spent_on: Date.new(2026, 8, 10), activity_id: activity_id,
+      tyear: 2026, tmonth: 8, tweek: Date.new(2026, 8, 10).cweek,
+      created_on: Time.current, updated_on: Time.current
+    }
+    TimeEntry.insert_all(Array.new(limit + 1) { base })
+
+    get :time_entries, params: { from: '2026-08-01' }
+    assert_response :success
+    json = JSON.parse(response.body)
+
+    assert_equal limit, json['time_entries'].size
+    assert_equal limit + 1, json['total_count']
+    assert_in_delta limit + 1, json['total_hours']
+  end
+
+  test 'project_id narrows the scope' do
+    grant(:log_time, :view_time_entries)
+    TimeEntry.create!(project: Project.find(1), user: User.find(2),
+                      author: User.find(2), hours: 1,
+                      spent_on: Date.new(2026, 8, 10), activity_id: activity_id)
+
+    get :time_entries, params: { project_id: 1, from: '2026-08-01' }
+    assert_response :success
+    assert_equal 1, JSON.parse(response.body)['total_count']
+  end
+
+  test 'project_id without the integration is a 403' do
+    grant(:view_time_entries)
+    get :time_entries, params: { project_id: 3 } # module never enabled
+    assert_response :forbidden
+  end
+
+  test 'issue_id narrows the scope' do
+    grant(:log_time, :view_time_entries)
+    TimeEntry.create!(project: Project.find(1), issue: Issue.find(1),
+                      user: User.find(2), author: User.find(2), hours: 1,
+                      spent_on: Date.new(2026, 8, 10), activity_id: activity_id)
+    TimeEntry.create!(project: Project.find(1), issue: Issue.find(2),
+                      user: User.find(2), author: User.find(2), hours: 2,
+                      spent_on: Date.new(2026, 8, 10), activity_id: activity_id)
+
+    get :time_entries, params: { issue_id: 1, from: '2026-08-01' }
+    assert_response :success
+    json = JSON.parse(response.body)
+    assert_equal 1, json['total_count']
+    assert_equal 1, json['time_entries'].sole['issue']['id']
+  end
+
+  test 'the unscoped index needs view_issues, matching the project branch' do
+    # view_time_entries + use_gtt_sync, but NOT view_issues: entries carry
+    # issue subjects, so both branches must refuse issue data consistently.
+    Role.find(1).update!(permissions: %i[use_gtt_sync view_time_entries log_time])
+    User.current = nil
+    TimeEntry.create!(project: Project.find(1), issue: Issue.find(1),
+                      user: User.find(2), author: User.find(2), hours: 1,
+                      spent_on: Date.new(2026, 8, 10), activity_id: activity_id)
 
     get :time_entries, params: {}
     assert_response :success
