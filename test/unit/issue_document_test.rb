@@ -297,9 +297,11 @@ class RedmineGttSyncIssueDocumentTest < ActiveSupport::TestCase
 
   # -- change lines: reference-attribute labels -----------------------------
 
-  def build_change(detail, base = 'https://x')
-    # change is a public module function (module_function), so call it directly.
-    RedmineGttSync::IssueDocument.change(base, detail)
+  def build_change(detail, base = 'https://x', user = User.anonymous)
+    # change is a public module function (module_function), so call it
+    # directly. The user is threaded through because reference labels are
+    # visibility-scoped (a Project label is only resolved when visible).
+    RedmineGttSync::IssueDocument.change(base, detail, user)
   end
 
   def test_change_resolves_reference_attribute_to_display_name

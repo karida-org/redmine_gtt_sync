@@ -22,7 +22,15 @@ module RedmineGttSync
         'created_on' => entry.created_on&.iso8601,
         'updated_on' => entry.updated_on&.iso8601
       }
-      hash['issue'] = { 'id' => entry.issue_id, 'subject' => entry.issue.subject } if entry.issue
+      # The subject only rides along when this user may see the issue itself.
+      # TimeEntry.visible scopes on :view_time_entries, not issue visibility,
+      # so an issue that became private after the time was logged would
+      # otherwise leak its subject through the entry. Redmine's own timelog
+      # API emits the id alone for the same reason.
+      if entry.issue
+        hash['issue'] = { 'id' => entry.issue_id }
+        hash['issue']['subject'] = entry.issue.subject if entry.issue.visible?(user)
+      end
       custom = custom_field_values(entry, user)
       hash['custom_fields'] = custom if custom.any?
       hash

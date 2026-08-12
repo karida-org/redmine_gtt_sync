@@ -55,6 +55,8 @@ class GttSyncController < ApplicationController
   # to nothing the user may see are omitted rather than reported, so existence
   # is not leaked - a client treats a missing entry like the single-issue 404.
   def issue_documents
+    return unless integration_allowed_globally?
+
     # Malformed input is a client error (400), unlike a valid id that resolves
     # to nothing (omitted): silently dropping bad tokens would let a broken
     # client read `ids=1,abc` as a clean answer for issue 1. The cap counts raw
@@ -143,6 +145,8 @@ class GttSyncController < ApplicationController
   # load (the "All projects, no query" scope). Cross-project by nature, so it is
   # gated per project rather than on a single one.
   def query_bundle
+    return unless integration_allowed_globally?
+
     issues =
       if params[:query_id].present?
         # A saved query runs across all projects it spans; gate the resulting
@@ -183,6 +187,8 @@ class GttSyncController < ApplicationController
 
         Issue.visible.where(project: project)
       else
+        return unless integration_allowed_globally?
+
         Issue.visible.where(project_id: gtt_sync_project_ids)
       end
 
@@ -225,6 +231,8 @@ class GttSyncController < ApplicationController
 
       scope = scope.where(project: project)
     else
+      return unless integration_allowed_globally?
+
       scope = scope.where(project_id: time_entry_project_ids)
     end
     scope = scope.where(issue_id: params[:issue_id]) if params[:issue_id].present?
@@ -258,7 +266,15 @@ class GttSyncController < ApplicationController
     entry = TimeEntry.new(project: issue.project, issue: issue,
                           author: User.current, user: User.current,
                           spent_on: User.current.today)
-    entry.safe_attributes = params[:time_entry].presence || params
+    # The ownership keys are decided here, not by the caller: TimeEntry marks
+    # user_id/issue_id/project_id safe, and assigning them sets @invalid_*
+    # ivars that validation later rejects - re-pinning the associations
+    # afterwards does NOT clear those, so a caller-supplied user_id turned
+    # into a 422 for a user who was allowed to log time all along.
+    attributes = (params[:time_entry].presence || params)
+                 .except(:user_id, :issue_id, :project_id, :id,
+                         :controller, :action, :format)
+    entry.safe_attributes = attributes
     entry.user = User.current
     entry.issue = issue
     entry.project = issue.project
@@ -278,11 +294,18 @@ class GttSyncController < ApplicationController
   # own user (no id in the path): a client can never move someone else's pin,
   # regardless of its permissions.
   def publish_location
+    # "The caller's own location" is meaningless for the anonymous principal,
+    # and use_gtt_sync may legitimately be granted to Anonymous (see init.rb),
+    # so a login is required before the integration gate is even consulted.
+    return require_login unless User.current.logged?
+
     # No per-project permission (the user's own data), but the integration
     # gate still applies: a user with no gtt_sync access anywhere is not a
     # client of this contract. It also restores OAuth scope narrowing, which
     # Redmine only applies to actions that check a permission - without this,
-    # a token issued with a single read scope could still move the pin.
+    # a token issued with a single read scope could still move the pin. Note
+    # this restores nothing for an admin token: User#allowed_to? short-circuits
+    # to true for admins before the scope check.
     unless User.current.allowed_to?(:use_gtt_sync, nil, global: true)
       return render json: {
         error: 'You are not allowed to use the GTT Sync integration.'
@@ -309,7 +332,10 @@ class GttSyncController < ApplicationController
     # response never confirms a private project's existence. It also accepts
     # an identifier, not just a numeric id.
     project = find_visible_project(params[:id])
-    return unless integration_allowed?(project)
+    # Only the integration gate: this endpoint exposes people's positions, not
+    # issue data, so requiring :view_issues here would be stricter than the
+    # data warrants. :view_user_locations below is the real gate.
+    return unless module_allowed?(project)
 
     unless User.current.allowed_to?(:view_user_locations, project)
       return render json: {
@@ -356,6 +382,32 @@ class GttSyncController < ApplicationController
     Project.allowed_to(User.current, :use_gtt_sync).ids
   end
 
+  # The cross-project branches (no project_id / no query) scope by
+  # gtt_sync_project_ids, which goes through Project.allowed_to_condition -
+  # and that path does NOT intersect an OAuth token's scopes: only
+  # User#allowed_to? passes the token scope down (see Redmine's
+  # User#allowed_to? vs Role#allowed_to?). Without this global check, a token
+  # issued without view_issues or use_gtt_sync would still read whole issue
+  # documents. Admin tokens are unaffected either way (User#allowed_to?
+  # short-circuits for admins before the scope check).
+  def integration_allowed_globally?
+    # No integration projects at all: the empty payload IS the answer, and has
+    # been since these endpoints existed. Refusing here would turn a
+    # legitimate "you have nothing" into an error.
+    return true if gtt_sync_project_ids.empty?
+
+    user = User.current
+    if user.allowed_to?(:use_gtt_sync, nil, global: true) &&
+       user.allowed_to?(:view_issues, nil, global: true)
+      return true
+    end
+
+    # The role grants integration projects but this credential does not carry
+    # the scope for them: that is a token problem, and refusing is the honest
+    # answer rather than silently serving what the scope excluded.
+    deny_integration
+  end
+
   # Keep to issues in gtt_sync-enabled projects, matching on project_id (no
   # per-issue project load). For the cross-project saved-query case, where the
   # issue set is already an in-memory array.
@@ -400,12 +452,22 @@ class GttSyncController < ApplicationController
   # The project is visible either way, so this is a 403 (not 404). Composes on
   # top of each action's own visibility scoping.
   def integration_allowed?(project)
-    user = User.current
-    if user.allowed_to?(:use_gtt_sync, project) &&
-       user.allowed_to?(:view_issues, project)
-      return true
-    end
+    return false unless module_allowed?(project)
+    return true if User.current.allowed_to?(:view_issues, project)
 
+    deny_integration
+  end
+
+  # The integration gate alone, for endpoints that expose no issue data (user
+  # locations). Split out so each endpoint asks for exactly what its payload
+  # justifies instead of inheriting a stricter check.
+  def module_allowed?(project)
+    return true if User.current.allowed_to?(:use_gtt_sync, project)
+
+    deny_integration
+  end
+
+  def deny_integration
     render json: {
       error: 'GTT integration is not enabled for this project or your role.'
     }, status: :forbidden

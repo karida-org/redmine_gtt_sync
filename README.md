@@ -28,6 +28,8 @@ integration contract on top:
 ## Requirements
 
 - Redmine 6.1 or higher (RedMica-based builds included).
+- PostgreSQL with the PostGIS extension. The whole geometry stack depends on
+  it (CI runs against `postgis/postgis:18-3.6`).
 - `redmine_gtt` installed (hard dependency, enforced at load). The geometry
   gems (`rgeo` and friends) arrive through `redmine_gtt`'s own Gemfile.
 
@@ -47,7 +49,13 @@ integration contract on top:
    bundle install
    ```
 
-   The plugin has no database migrations of its own.
+3. Run the plugin's migrations (required: the live-location contract adds a
+   `users.geom_updated_on` column, and both location endpoints fail without
+   it):
+
+   ```sh
+   bundle exec rake redmine:plugins:migrate RAILS_ENV=production
+   ```
 
 ## Setup
 
@@ -55,12 +63,18 @@ integration contract on top:
    open *Settings > Modules* and enable **GTT Sync**.
 2. **Grant the permission**: in *Administration > Roles and permissions*, give
    **Use GTT Sync** to the roles that may use the integration.
-3. **Turn on OAuth sign-in (recommended)**: in *Administration > Plugins >
+3. **Grant location reading (optional)**: the same screen carries **View user
+   locations**, a separate permission for reading where colleagues are. Give
+   it only to dispatcher-like roles. Publishing one's *own* location does not
+   need this permission - it is the user's own data, and the client decides
+   whether to share at all - but it does still need **Use GTT Sync**, like
+   every other endpoint in this contract.
+4. **Turn on OAuth sign-in (recommended)**: in *Administration > Plugins >
    Redmine GTT Sync > Configure*, click *Set up the QGIS / QTask connection*.
    This creates a public PKCE OAuth application (no secret involved) and
    advertises its client id on the capabilities probe. The button is safe to
    click again later; it re-checks and repairs the settings.
-4. **Turn on mobile sign-in (optional)**: on the same settings screen, click
+5. **Turn on mobile sign-in (optional)**: on the same settings screen, click
    *Set up the mobile app connection*. This provisions a second public PKCE
    application with a custom-scheme redirect (`georeport://oauth/callback`)
    for the Georeport mobile app and advertises it on the capabilities probe
@@ -70,7 +84,7 @@ integration contract on top:
    clicking a set-up button again reconciles the managed application back to
    the plugin defaults, including its redirect list, so re-apply custom
    redirects after a repair run.
-5. **Point users at the Connect page**: the *Connect* item in the top menu
+6. **Point users at the Connect page**: the *Connect* item in the top menu
    (visible to users who hold the permission somewhere) shows the instance
    URL, client id, and scopes, and serves a downloadable QGIS OAuth2 config.
 
@@ -91,6 +105,10 @@ All endpoints return JSON and respect the access rules above.
 | `GET /gtt_sync/issues?ids=1,2,3` | Batch form of the issue document (up to 100 ids per request), used for offline packaging. |
 | `GET /gtt_sync/projects/:id/schema` | Per-project editing schema: trackers, statuses, custom fields, writable field names, and reference options for the current user. |
 | `GET /gtt_sync/changes?since=<token>` | Delta feed: issues changed since a cursor, so clients resync incrementally. Optional `project_id` narrows the scope; `known_ids=1` adds the full id set for deletion reconciliation. |
+| `GET /gtt_sync/time_entries` | The authenticated user's own time entries for a date range (`from`, `to`, optional `project_id` / `issue_id`), with totals over the whole filtered range. Only `user_id=me` is accepted. |
+| `POST /gtt_sync/issues/:id/time_entries` | Log time on an issue. The entry is always attributed to the caller, and Redmine's own `:log_time` rules decide whether it is allowed. |
+| `POST /gtt_sync/users/me/location` | Publish the caller's current location (a GeoJSON `Point`, or a `Feature` wrapping one). Always the caller's own user: there is no id in the path. Only the latest point is kept, so no movement history is stored. |
+| `GET /gtt_sync/projects/:id/user_locations` | Project members' latest locations with a `last_heard` timestamp, for assigning work to whoever is nearby. Requires the separate `view_user_locations` permission. |
 
 A few details matter for client authors:
 
