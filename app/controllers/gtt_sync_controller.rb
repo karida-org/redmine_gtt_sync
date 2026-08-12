@@ -12,7 +12,8 @@ class GttSyncController < ApplicationController
   skip_before_action :check_if_login_required, only: [:capabilities]
   accept_api_auth :capabilities, :issue, :issue_documents, :project_bundle,
                   :project_schema, :query_bundle, :changes,
-                  :time_entries, :create_time_entry
+                  :time_entries, :create_time_entry,
+                  :publish_location, :user_locations
 
   # Hard cap on ids per batch request, so one call can't turn into an
   # unbounded response; a client with a larger scope chunks its requests.
@@ -271,6 +272,54 @@ class GttSyncController < ApplicationController
     end
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Issue not found' }, status: :not_found
+  end
+
+  # Publishes the authenticated user's current location. Always the caller's
+  # own user (no id in the path): a client can never move someone else's pin,
+  # regardless of its permissions.
+  def publish_location
+    # No per-project permission (the user's own data), but the integration
+    # gate still applies: a user with no gtt_sync access anywhere is not a
+    # client of this contract. It also restores OAuth scope narrowing, which
+    # Redmine only applies to actions that check a permission - without this,
+    # a token issued with a single read scope could still move the pin.
+    unless User.current.allowed_to?(:use_gtt_sync, nil, global: true)
+      return render json: {
+        error: 'You are not allowed to use the GTT Sync integration.'
+      }, status: :forbidden
+    end
+
+    payload = params[:location].presence || params[:geojson].presence
+    payload = payload.to_unsafe_h if payload.respond_to?(:to_unsafe_h)
+    ok, error = RedmineGttSync::UserLocations.publish(User.current, payload)
+
+    if ok
+      render json: RedmineGttSync::UserLocations.location_hash(User.current.reload)
+    else
+      render json: { 'errors' => [error] }, status: :unprocessable_entity
+    end
+  end
+
+  # The project members' latest locations, for assigning whoever is nearby.
+  # Gated by :view_user_locations on this project, so it is off unless a role
+  # was deliberately granted it.
+  def user_locations
+    # Same resolution as every other project-scoped action: Project.visible,
+    # so a project the caller cannot see is a 404 like a missing one and the
+    # response never confirms a private project's existence. It also accepts
+    # an identifier, not just a numeric id.
+    project = find_visible_project(params[:id])
+    return unless integration_allowed?(project)
+
+    unless User.current.allowed_to?(:view_user_locations, project)
+      return render json: {
+        error: 'You are not allowed to view user locations in this project.'
+      }, status: :forbidden
+    end
+
+    render json: RedmineGttSync::UserLocations.index(project, User.current)
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Project not found' }, status: :not_found
   end
 
   private

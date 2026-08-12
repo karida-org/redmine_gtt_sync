@@ -57,6 +57,12 @@ Redmine::Plugin.register :redmine_gtt_sync do
     permission :use_gtt_sync,
                { gtt_sync: %i[project_bundle project_schema issue
                               issue_documents query_bundle changes] }
+    # Reading where colleagues are is dispatcher work, not something every
+    # member should get by default: its own permission, off unless granted.
+    # Publishing one's OWN location needs no permission (it is the user's own
+    # data, and the client decides whether to share at all).
+    permission :view_user_locations,
+               { gtt_sync: %i[user_locations] }
   end
 
   # Which public OAuth application QTask advertises (its client_id) on the

@@ -90,3 +90,17 @@ post 'gtt_sync/issues/:id/time_entries',
      to: 'gtt_sync#create_time_entry',
      as: 'gtt_sync_issue_time_entries',
      defaults: { format: 'json' }
+
+# Publish the authenticated user's current location (a GeoJSON Point). Always
+# the caller's own user: there is no id in the path, by design.
+post 'gtt_sync/users/me/location',
+     to: 'gtt_sync#publish_location',
+     as: 'gtt_sync_user_location',
+     defaults: { format: 'json' }
+
+# The project members' latest locations, for assigning whoever is nearby.
+# Gated by the dedicated :view_user_locations permission.
+get 'gtt_sync/projects/:id/user_locations',
+    to: 'gtt_sync#user_locations',
+    as: 'gtt_sync_project_user_locations',
+    defaults: { format: 'json' }
