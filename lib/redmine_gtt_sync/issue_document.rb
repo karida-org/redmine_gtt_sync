@@ -181,13 +181,13 @@ module RedmineGttSync
           # stock PUT /journals/:id.json write.
           'notes_editable' => (journal.editable_by?(user) if journal.notes.present?),
           'details' => journal.visible_details(user).map do |detail|
-            change(base, detail, label_cache)
+            change(base, detail, user, label_cache)
           end
         }.compact
       end
     end
 
-    def change(base, detail, label_cache = {})
+    def change(base, detail, user, label_cache = {})
       # A description edit (and other long-text) carries a large before/after
       # that is noise inline; link to Redmine's own diff page instead of shipping
       # the full text. Redmine renders exactly this diff at journals/:id/diff.
@@ -212,8 +212,8 @@ module RedmineGttSync
       # to display names here, where we can honour deletions and don't force the
       # client to fetch and join the status/user/version/... dictionaries. Only
       # added when resolvable, so old_value/new_value stay authoritative.
-      old_label = reference_label(detail, detail.old_value, label_cache)
-      new_label = reference_label(detail, detail.value, label_cache)
+      old_label = reference_label(detail, detail.old_value, user, label_cache)
+      new_label = reference_label(detail, detail.value, user, label_cache)
       change['old_label'] = old_label if old_label
       change['new_label'] = new_label if new_label
       change
@@ -232,7 +232,7 @@ module RedmineGttSync
     # history resolves an "<assoc>_id" attribute against its association, so the
     # labels match the web UI (and honour records deleted since the change).
     # ``label_cache`` memoizes [association, id] lookups across a document build.
-    def reference_label(detail, value, label_cache = {})
+    def reference_label(detail, value, user, label_cache = {})
       return nil unless detail.property == 'attr'
 
       key = detail.prop_key.to_s
@@ -242,23 +242,24 @@ module RedmineGttSync
       cache_key = [assoc_name, value.to_s]
       return label_cache[cache_key] if label_cache.key?(cache_key)
 
-      label_cache[cache_key] = resolve_reference_name(assoc_name, value)
+      label_cache[cache_key] = resolve_reference_name(assoc_name, value, user)
     end
 
-    def resolve_reference_name(assoc_name, value)
+    # Mirrors IssuesHelper#find_name_by_reflection: only ``name`` is ever
+    # resolved, and a Project must be visible to this user. Core is deliberate
+    # about both. Anything else (a parent issue, say) keeps its bare id, the
+    # same way core renders "##{detail.value}" rather than a subject the
+    # reader may not be allowed to see.
+    def resolve_reference_name(assoc_name, value, user)
       association = Issue.reflect_on_association(assoc_name)
       return nil unless association
 
       record = association.klass.find_by(id: value)
       return nil unless record
+      return nil unless record.respond_to?(:name)
+      return nil if record.is_a?(Project) && !record.visible?(user)
 
-      if record.respond_to?(:name)
-        record.name
-      elsif record.respond_to?(:subject)
-        record.subject
-      else
-        record.to_s
-      end
+      record.name
     rescue NameError => e
       # Degrade to no label only for the expected lookup fault: a reflection
       # whose class can't be resolved (e.g. a polymorphic association raises

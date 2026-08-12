@@ -56,7 +56,9 @@ Redmine::Plugin.register :redmine_gtt_sync do
   project_module :gtt_sync do
     permission :use_gtt_sync,
                { gtt_sync: %i[project_bundle project_schema issue
-                              issue_documents query_bundle changes] }
+                              issue_documents query_bundle changes
+                              time_entries create_time_entry
+                              publish_location] }
     # Reading where colleagues are is dispatcher work, not something every
     # member should get by default: its own permission, off unless granted.
     # Publishing one's OWN location needs no permission (it is the user's own
