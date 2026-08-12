@@ -146,6 +146,56 @@ class GttSyncUserLocationsTest < ActionController::TestCase
     assert_not_includes ids, 3
   end
 
+  test 'omits locked accounts, who are nobody to dispatch' do
+    grant(:view_user_locations)
+    User.find(2).update_columns(geom: 'SRID=4326;POINT(1 2)',
+                                geom_updated_on: Time.current)
+    User.find(3).update_columns(geom: 'SRID=4326;POINT(3 4)',
+                                geom_updated_on: Time.current)
+    User.find(3).update_column(:status, User::STATUS_LOCKED)
+
+    get :user_locations, params: { id: 1 }
+
+    assert_response :success
+    ids = response.parsed_body['locations'].map { |entry| entry.dig('user', 'id') }
+    assert_includes ids, 2
+    assert_not_includes ids, 3
+  end
+
+  test 'a project the caller cannot see is a 404, not a 403' do
+    # Private and without the caller as a member: answering 403 (or any other
+    # distinguishable status) would confirm that the project exists.
+    grant(:view_user_locations)
+    hidden = Project.find(2)
+    hidden.update_columns(is_public: false)
+    hidden.members.where(user_id: 2).destroy_all
+    User.current = nil
+
+    get :user_locations, params: { id: 2 }
+
+    assert_response :not_found
+  end
+
+  test 'accepts a project identifier, like the other project endpoints' do
+    grant(:view_user_locations)
+
+    get :user_locations, params: { id: Project.find(1).identifier }
+
+    assert_response :success
+  end
+
+  test 'publishing requires the integration gate' do
+    # No use_gtt_sync anywhere: not a client of this contract, and over OAuth
+    # this is also what makes the token's scopes count.
+    Role.find(1).update!(permissions: [:view_issues])
+    User.current = nil
+
+    post :publish_location, params: { location: point(1.0, 2.0) }
+
+    assert_response :forbidden
+    assert_nil User.find(2).geom_updated_on
+  end
+
   test 'a project without the module is refused' do
     grant(:view_user_locations)
     project = Project.find(1)
@@ -179,6 +229,22 @@ class GttSyncUserLocationsTest < ActionController::TestCase
   end
 
   # --- serialization unit level ---
+
+  test 'a non-point geometry is omitted rather than listed with a null point' do
+    grant(:view_user_locations)
+    User.find(2).update_columns(geom: 'SRID=4326;POINT(1 2)',
+                                geom_updated_on: Time.current)
+    User.find(3).update_columns(
+      geom: 'SRID=4326;LINESTRING(0 0, 1 1)', geom_updated_on: Time.current
+    )
+
+    get :user_locations, params: { id: 1 }
+
+    assert_response :success
+    locations = response.parsed_body['locations']
+    assert(locations.none? { |entry| entry['location'].nil? })
+    assert_not_includes locations.map { |e| e.dig('user', 'id') }, 3
+  end
 
   test 'a location that was never published reports an unknown last_heard' do
     User.find(2).update_columns(geom: 'SRID=4326;POINT(1 2)',

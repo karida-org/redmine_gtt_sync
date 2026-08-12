@@ -278,6 +278,17 @@ class GttSyncController < ApplicationController
   # own user (no id in the path): a client can never move someone else's pin,
   # regardless of its permissions.
   def publish_location
+    # No per-project permission (the user's own data), but the integration
+    # gate still applies: a user with no gtt_sync access anywhere is not a
+    # client of this contract. It also restores OAuth scope narrowing, which
+    # Redmine only applies to actions that check a permission - without this,
+    # a token issued with a single read scope could still move the pin.
+    unless User.current.allowed_to?(:use_gtt_sync, nil, global: true)
+      return render json: {
+        error: 'You are not allowed to use the GTT Sync integration.'
+      }, status: :forbidden
+    end
+
     payload = params[:location].presence || params[:geojson].presence
     payload = payload.to_unsafe_h if payload.respond_to?(:to_unsafe_h)
     ok, error = RedmineGttSync::UserLocations.publish(User.current, payload)
@@ -293,7 +304,11 @@ class GttSyncController < ApplicationController
   # Gated by :view_user_locations on this project, so it is off unless a role
   # was deliberately granted it.
   def user_locations
-    project = Project.find(params[:id])
+    # Same resolution as every other project-scoped action: Project.visible,
+    # so a project the caller cannot see is a 404 like a missing one and the
+    # response never confirms a private project's existence. It also accepts
+    # an identifier, not just a numeric id.
+    project = find_visible_project(params[:id])
     return unless integration_allowed?(project)
 
     unless User.current.allowed_to?(:view_user_locations, project)

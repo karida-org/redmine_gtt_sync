@@ -28,16 +28,27 @@ module RedmineGttSync
       }
     end
 
-    # The members whose location +viewer+ may read in +project+: project
-    # members, self always included, each with their latest point. Members
-    # without a location are omitted (an entry with a null point is noise for
-    # a "who is nearby" list, not information).
+    # The members whose location +viewer+ may read in +project+: active
+    # project members with a usable point, self included. Entries without a
+    # renderable location are omitted (a null point is noise for a "who is
+    # nearby" list, not information), and so are locked accounts - a
+    # deactivated user is not someone to dispatch, matching Redmine's own
+    # assignable-principal behavior.
     def index(project, viewer)
       users = project.members.includes(:user).filter_map do |member|
-        member.user if member.user.is_a?(User) && member.user.geom.present?
+        user = member.user
+        user if locatable?(user)
       end
-      users << viewer if viewer.geom.present? && users.exclude?(viewer)
+      users << viewer if locatable?(viewer) && users.exclude?(viewer)
       { 'locations' => users.uniq.map { |user| location_hash(user) } }
+    end
+
+    # Whether this principal belongs in a "who is nearby" list at all. Groups
+    # (also Members) never do; the point must be one this contract can
+    # actually render.
+    def locatable?(principal)
+      principal.is_a?(User) && principal.active? &&
+        point_geojson(principal.geom).present?
     end
 
     # Writes +geojson+ as the user's current location. Accepts a GeoJSON
