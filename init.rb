@@ -61,7 +61,8 @@ Redmine::Plugin.register :redmine_gtt_sync do
   # Which public OAuth application QTask advertises (its client_id) on the
   # capabilities probe, so users don't have to look it up on the admin-only
   # applications page. Empty = advertise scopes/endpoints only. See #26.
-  settings default: { 'oauth_application_uid' => '' },
+  settings default: { 'oauth_application_uid' => '',
+                      'oauth_mobile_application_uid' => '' },
            partial: 'settings/redmine_gtt_sync'
 
   # Discoverable, self-serve "Connect QGIS" page (#27). Shown only to users who

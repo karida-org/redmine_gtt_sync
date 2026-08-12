@@ -155,4 +155,75 @@ class RedmineGttSyncOAuthTest < ActiveSupport::TestCase
     assert_not_equal confidential.id, app.id
     assert_not app.confidential?
   end
+
+  def test_ensure_mobile_application_creates_a_public_custom_scheme_app
+    app = RedmineGttSync::OAuth.ensure_mobile_application
+    assert app.persisted?
+    assert_not app.confidential?
+    assert_equal RedmineGttSync::OAuth::MOBILE_REDIRECT_URI, app.redirect_uri
+    assert_equal RedmineGttSync::OAuth::SCOPES.join(' '), app.scopes.to_s
+    # A phone cannot listen on a loopback port, so the redirect is a custom
+    # URL scheme, which Doorkeeper must accept as-is.
+    assert app.redirect_uri.start_with?('georeport://')
+  end
+
+  def test_ensure_mobile_application_is_idempotent_and_reconciles
+    first = RedmineGttSync::OAuth.ensure_mobile_application
+    first.update!(scopes: 'view_issues', redirect_uri: 'georeport://drifted')
+    second = RedmineGttSync::OAuth.ensure_mobile_application
+    assert_equal first.id, second.id
+    assert_equal RedmineGttSync::OAuth::SCOPES.join(' '), second.scopes.to_s
+    assert_equal RedmineGttSync::OAuth::MOBILE_REDIRECT_URI, second.redirect_uri
+  end
+
+  def test_advertisement_has_no_clients_block_when_nothing_is_advertised
+    ad = RedmineGttSync::OAuth.advertisement('https://demo.example.org')
+    assert_not ad.key?(:clients)
+  end
+
+  def test_advertisement_clients_carry_record_backed_entries
+    desktop = RedmineGttSync::OAuth.ensure_qtask_application
+    mobile = RedmineGttSync::OAuth.ensure_mobile_application
+    ad = RedmineGttSync::OAuth.advertisement(
+      'https://demo.example.org',
+      client_id: desktop.uid, mobile_client_id: mobile.uid
+    )
+
+    # Back-compat: released QTask reads the top-level client_id.
+    assert_equal desktop.uid, ad[:client_id]
+    assert_equal %i[desktop mobile], ad[:clients].keys
+
+    assert_equal desktop.uid, ad[:clients][:desktop][:client_id]
+    assert_equal [RedmineGttSync::OAuth::QTASK_REDIRECT_URI],
+                 ad[:clients][:desktop][:redirect_uris]
+
+    assert_equal mobile.uid, ad[:clients][:mobile][:client_id]
+    assert_equal [RedmineGttSync::OAuth::MOBILE_REDIRECT_URI],
+                 ad[:clients][:mobile][:redirect_uris]
+    assert_equal RedmineGttSync::OAuth::SCOPES, ad[:clients][:mobile][:scopes]
+  end
+
+  def test_client_entry_reflects_admin_customizations
+    mobile = RedmineGttSync::OAuth.ensure_mobile_application
+    # An admin may add an app-link redirect and narrow the allowlist; the
+    # advertised entry must mirror the record, not the plugin defaults.
+    mobile.update!(
+      redirect_uri: "georeport://oauth/callback\nhttps://app.example.org/oauth",
+      scopes: 'view_issues use_gtt_sync'
+    )
+    entry = RedmineGttSync::OAuth.client_entry(mobile.uid)
+    assert_equal ['georeport://oauth/callback', 'https://app.example.org/oauth'],
+                 entry[:redirect_uris]
+    assert_equal %w[view_issues use_gtt_sync], entry[:scopes]
+  end
+
+  def test_client_entry_never_resolves_a_confidential_app
+    confidential = Doorkeeper::Application.create!(
+      name: 'Secret', redirect_uri: 'https://x.example.org/cb',
+      scopes: 'view_issues', confidential: true
+    )
+    assert_nil RedmineGttSync::OAuth.client_entry(confidential.uid)
+    assert_nil RedmineGttSync::OAuth.client_entry('')
+    assert_nil RedmineGttSync::OAuth.client_entry('unknown')
+  end
 end

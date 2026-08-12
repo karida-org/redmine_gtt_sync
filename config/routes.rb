@@ -18,6 +18,11 @@ post 'gtt_sync/oauth_application',
      to: 'gtt_sync_settings#create_oauth_application',
      as: 'gtt_sync_create_oauth_application'
 
+# Same, for the Georeport mobile application (custom-scheme redirect).
+post 'gtt_sync/mobile_oauth_application',
+     to: 'gtt_sync_settings#create_mobile_oauth_application',
+     as: 'gtt_sync_create_mobile_oauth_application'
+
 # Capabilities probe: lets a client feature-detect what this server supports
 # before authenticating or attempting an unsupported operation.
 get 'gtt_sync/capabilities',

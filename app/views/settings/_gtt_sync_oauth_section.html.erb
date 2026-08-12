@@ -1,0 +1,61 @@
+<%
+  # One advertised-application section (desktop QTask or the mobile app),
+  # rendered by _redmine_gtt_sync.html.erb. Locals:
+  #   public_apps: eligible (non-confidential) Doorkeeper applications
+  #   settings:    the plugin settings hash
+  #   section:     per-kind keys: setting_key, create_path, and the locale
+  #                symbols for status/select/button/scope texts
+  selected = settings[section[:setting_key]]
+  selected_app = public_apps.detect { |app| app.uid == selected } if selected.present?
+  field_id = "settings_#{section[:setting_key]}"
+%>
+
+<p>
+  <label><%= l(section[:status_label]) %></label>
+  <% if selected_app %>
+    <span class="icon icon-ok"><%= l(section[:status_ready]) %></span>
+  <% else %>
+    <span class="icon icon-warning"><%= l(section[:status_off]) %></span>
+  <% end %>
+</p>
+
+<p>
+  <label for="<%= field_id %>"><%= l(section[:select_label]) %></label>
+  <%= select_tag "settings[#{section[:setting_key]}]",
+        options_for_select(
+          [[l(:label_gtt_sync_oauth_application_none), '']] +
+            public_apps.map { |app| [app.name, app.uid] },
+          selected
+        ),
+        id: field_id %>
+  <em class="info"><%= l(section[:select_hint]) %></em>
+</p>
+
+<p>
+  <%# An <a> (not a nested form) so it is valid inside the settings form; UJS
+      turns method: :post into a CSRF-protected POST. %>
+  <%= link_to l(section[:button_label]),
+              section[:create_path],
+              method: :post, class: 'icon icon-add' %>
+  <em class="info"><%= l(section[:button_hint]) %></em>
+</p>
+
+<%
+  # The selected app's allowlist is the source of truth for what the client may
+  # do: show which actions it allows so an admin sees the effect of narrowing
+  # or expanding it. The set-up button above restores the full recommended set.
+%>
+<% if selected_app %>
+  <% status = RedmineGttSync::OAuth.scope_status(selected_app.uid) %>
+  <p>
+    <label><%= l(section[:scope_label]) %></label>
+    <span><%= l(section[:scopes_granted],
+                count: status[:granted].size,
+                total: RedmineGttSync::OAuth::SCOPES.size) %></span>
+    <% if status[:ungranted].any? %>
+      <br />
+      <em class="info"><%= l(section[:scopes_ungranted],
+                             scopes: status[:ungranted].join(', ')) %></em>
+    <% end %>
+  </p>
+<% end %>
