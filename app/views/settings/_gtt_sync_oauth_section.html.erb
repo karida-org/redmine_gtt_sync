@@ -8,6 +8,14 @@
   selected = settings[section[:setting_key]]
   selected_app = public_apps.detect { |app| app.uid == selected } if selected.present?
   field_id = "settings_#{section[:setting_key]}"
+  # Any public app may be selected (custom registrations with their own
+  # redirects are legitimate), but warn when the selection has no redirect the
+  # section's client kind can plausibly use, since sign-in would then fail at
+  # the grant step.
+  redirect_mismatch =
+    selected_app &&
+    section[:expected_redirect_pattern] &&
+    selected_app.redirect_uri.to_s.split.none? { |uri| uri.match?(section[:expected_redirect_pattern]) }
 %>
 
 <p>
@@ -29,6 +37,10 @@
         ),
         id: field_id %>
   <em class="info"><%= l(section[:select_hint]) %></em>
+  <% if redirect_mismatch %>
+    <br />
+    <span class="icon icon-warning"><%= l(section[:redirect_mismatch_warning]) %></span>
+  <% end %>
 </p>
 
 <p>

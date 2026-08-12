@@ -66,7 +66,10 @@ integration contract on top:
    for the Georeport mobile app and advertises it on the capabilities probe
    under `oauth.clients.mobile`. The application record stays the source of
    truth: an admin who needs a different or additional redirect can edit the
-   application, and the probe advertises what the record holds.
+   application, and the probe advertises what the record holds. Note that
+   clicking a set-up button again reconciles the managed application back to
+   the plugin defaults, including its redirect list, so re-apply custom
+   redirects after a repair run.
 5. **Point users at the Connect page**: the *Connect* item in the top menu
    (visible to users who hold the permission somewhere) shows the instance
    URL, client id, and scopes, and serves a downloadable QGIS OAuth2 config.

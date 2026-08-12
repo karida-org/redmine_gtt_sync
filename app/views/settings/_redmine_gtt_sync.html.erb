@@ -45,7 +45,9 @@
                button_hint: :text_gtt_sync_create_oauth_application_hint,
                scope_label: :label_gtt_sync_oauth_scope_status,
                scopes_granted: :text_gtt_sync_oauth_scopes_granted,
-               scopes_ungranted: :text_gtt_sync_oauth_scopes_ungranted
+               scopes_ungranted: :text_gtt_sync_oauth_scopes_ungranted,
+               redirect_mismatch_warning: :text_gtt_sync_oauth_redirect_mismatch,
+               expected_redirect_pattern: %r{\Ahttp://127\.0\.0\.1}
              }
            } %>
 
@@ -67,7 +69,9 @@
                button_hint: :text_gtt_sync_create_mobile_oauth_application_hint,
                scope_label: :label_gtt_sync_mobile_oauth_scope_status,
                scopes_granted: :text_gtt_sync_mobile_oauth_scopes_granted,
-               scopes_ungranted: :text_gtt_sync_mobile_oauth_scopes_ungranted
+               scopes_ungranted: :text_gtt_sync_mobile_oauth_scopes_ungranted,
+               redirect_mismatch_warning: :text_gtt_sync_mobile_oauth_redirect_mismatch,
+               expected_redirect_pattern: %r{\A(georeport://|https://)}
              }
            } %>
 

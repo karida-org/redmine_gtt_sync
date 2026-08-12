@@ -15,6 +15,8 @@ ja:
   label_gtt_sync_oauth_scope_status: "QGIS ユーザーができること"
   text_gtt_sync_oauth_scopes_granted: "この接続では、QTask の操作 %{total} 件のうち %{count} 件が許可されています。QTask はこの許可だけを使うため、接続から権限を外すと、対応する機能が QGIS 上で非表示になります。"
   text_gtt_sync_oauth_scopes_ungranted: "現在オフのもの（権限を戻すまで QGIS では使えません）: %{scopes}"
+  text_gtt_sync_oauth_redirect_mismatch: "この接続にはデスクトップ用の戻り先アドレス（http://127.0.0.1...）がないため、QGIS からのサインインは失敗する可能性があります。下の設定ボタンで管理対象の接続を修復できます。"
+  text_gtt_sync_mobile_oauth_redirect_mismatch: "この接続にはモバイルアプリが使える戻り先アドレス（georeport:// または https のアプリリンク）がないため、アプリからのサインインは失敗する可能性があります。下の設定ボタンで管理対象の接続を修復できます。"
   label_gtt_sync_oauth_section_desktop: "QGIS デスクトップ（QTask）"
   label_gtt_sync_oauth_section_mobile: "Georeport モバイルアプリ"
   text_gtt_sync_mobile_oauth_intro: "Georeport モバイルアプリも同じ仕組みで接続します。スマートフォンから普段のアカウントでサインインでき、手作業でコピーするものはありません。ここで設定しておくと、アプリはこのサイトのアドレスを入力するだけで自動的に設定されます。"
