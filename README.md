@@ -65,9 +65,10 @@ integration contract on top:
    **Use GTT Sync** to the roles that may use the integration.
 3. **Grant location reading (optional)**: the same screen carries **View user
    locations**, a separate permission for reading where colleagues are. Give
-   it only to dispatcher-like roles. Publishing one's *own* location needs no
-   permission, because it is the user's own data and the client decides
-   whether to share at all.
+   it only to dispatcher-like roles. Publishing one's *own* location does not
+   need this permission - it is the user's own data, and the client decides
+   whether to share at all - but it does still need **Use GTT Sync**, like
+   every other endpoint in this contract.
 4. **Turn on OAuth sign-in (recommended)**: in *Administration > Plugins >
    Redmine GTT Sync > Configure*, click *Set up the QGIS / QTask connection*.
    This creates a public PKCE OAuth application (no secret involved) and
