@@ -11,11 +11,16 @@ class GttSyncController < ApplicationController
   # data, so it stays behind login + visibility.
   skip_before_action :check_if_login_required, only: [:capabilities]
   accept_api_auth :capabilities, :issue, :issue_documents, :project_bundle,
-                  :project_schema, :query_bundle, :changes
+                  :project_schema, :query_bundle, :changes,
+                  :time_entries, :create_time_entry
 
   # Hard cap on ids per batch request, so one call can't turn into an
   # unbounded response; a client with a larger scope chunks its requests.
   ISSUE_DOCUMENTS_LIMIT = 100
+
+  # Cap on entries per time-entry index response; totals are computed over the
+  # whole filtered scope, so a truncated list still carries a correct summary.
+  TIME_ENTRIES_LIMIT = 200
 
   def capabilities
     render json: RedmineGttSync::Capabilities.report
@@ -191,7 +196,98 @@ class GttSyncController < ApplicationController
     render json: { error: 'Project not found' }, status: :not_found
   end
 
+  # The authenticated user's own time entries for a date range (issue #89):
+  # powers a "my time today / this week" summary. Own-entries by definition -
+  # a user_id other than "me" (or the caller's own id) is refused rather than
+  # silently reinterpreted. Reads delegate to TimeEntry.visible, so a role
+  # whose time_entries_visibility forbids even own entries gets an empty
+  # list, exactly as in the Redmine UI.
+  def time_entries
+    if params[:user_id].present? &&
+       !['me', User.current.id.to_s].include?(params[:user_id].to_s)
+      return render json: {
+        error: 'only user_id=me is supported: this endpoint serves the ' \
+               'authenticated user\'s own time entries'
+      }, status: :bad_request
+    end
+
+    from = parse_iso_date(:from)
+    return if performed? # a malformed date already rendered the 400
+
+    to = parse_iso_date(:to)
+    return if performed?
+
+    scope = TimeEntry.visible.where(user: User.current)
+    if params[:project_id].present?
+      project = find_visible_project(params[:project_id])
+      return unless integration_allowed?(project)
+
+      scope = scope.where(project: project)
+    else
+      scope = scope.where(project_id: gtt_sync_project_ids)
+    end
+    scope = scope.where(issue_id: params[:issue_id]) if params[:issue_id].present?
+    scope = scope.where(spent_on: from..) if from
+    scope = scope.where(spent_on: ..to) if to
+
+    render json: RedmineGttSync::TimeEntries.index(
+      scope, limit: TIME_ENTRIES_LIMIT, user: User.current
+    )
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Project not found' }, status: :not_found
+  end
+
+  # Log time on an issue (issue #89), with core semantics throughout: the
+  # entry is created exactly as Redmine's own timelog controller creates it
+  # (author and user are the authenticated user, spent_on defaults to the
+  # user's today), attributes flow through safe_attributes, and the gate is
+  # Issue#time_loggable? (:log_time plus the closed-issues setting). Logging
+  # for someone else is out of the contract's scope by design, so the entry's
+  # user is pinned to the caller even for roles that could reassign it.
+  def create_time_entry
+    issue = Issue.visible.find(params[:id])
+    return unless integration_allowed?(issue.project)
+
+    unless issue.time_loggable?(User.current)
+      return render json: {
+        error: 'You are not allowed to log time on this issue.'
+      }, status: :forbidden
+    end
+
+    entry = TimeEntry.new(project: issue.project, issue: issue,
+                          author: User.current, user: User.current,
+                          spent_on: User.current.today)
+    entry.safe_attributes = params[:time_entry].presence || params
+    entry.user = User.current
+    entry.issue = issue
+    entry.project = issue.project
+
+    if entry.save
+      render json: RedmineGttSync::TimeEntries.entry_hash(entry, User.current),
+             status: :created
+    else
+      render json: { 'errors' => entry.errors.full_messages },
+             status: :unprocessable_entity
+    end
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Issue not found' }, status: :not_found
+  end
+
   private
+
+  # ISO 8601 date param, or nil when absent; a present-but-malformed value is
+  # a client error, not a silent full-range query.
+  def parse_iso_date(key)
+    raw = params[key].presence
+    return nil unless raw
+
+    Date.iso8601(raw)
+  rescue ArgumentError
+    render json: {
+      error: "#{key} must be an ISO 8601 date (YYYY-MM-DD)"
+    }, status: :bad_request
+    nil
+  end
 
   # Ids of projects where the current user may use the integration
   # (use_gtt_sync is project-scoped, and Project.allowed_to already factors in

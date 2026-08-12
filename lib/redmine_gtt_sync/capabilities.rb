@@ -29,6 +29,8 @@ module RedmineGttSync
       geometry_only_patch: :gtt_sync_geometry,
       change_feed: :gtt_sync_changes,
       schema_introspection: :gtt_sync_project_schema,
+      time_entries: :gtt_sync_time_entries,
+      time_entry_create: :gtt_sync_issue_time_entries,
       ogc_api_features: :gtt_sync_ogc_features, # planned: issue #11 (read-only)
       # Not planned (dropped from #11): legacy XML transactions nobody in this
       # ecosystem asks for; standards writes would be OGC API Part 4 instead.

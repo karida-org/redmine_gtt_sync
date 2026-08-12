@@ -180,6 +180,7 @@ module RedmineGttSync
         safe_attribute_names new_statuses_allowed_to
         editable_custom_field_values assignable_users assignable_versions
         deletable notes_addable attachments_addable attributes_editable
+        time_loggable
       ].freeze
 
       attr_accessor(*DATA_ATTRS)
@@ -202,6 +203,7 @@ module RedmineGttSync
         @notes_addable = true
         @attachments_addable = true
         @attributes_editable = true
+        @time_loggable = true
         attrs.each do |key, value|
           unless DATA_ATTRS.include?(key) || CONFIG_ATTRS.include?(key)
             # Fail loudly on a typo; a silently ignored key would leave the
@@ -252,6 +254,11 @@ module RedmineGttSync
 
       def attributes_editable?(_user = nil)
         @attributes_editable
+      end
+
+      # Real: Issue#time_loggable?(user = User.current).
+      def time_loggable?(_user = nil)
+        @time_loggable
       end
     end
   end

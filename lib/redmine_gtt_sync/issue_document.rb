@@ -105,6 +105,9 @@ module RedmineGttSync
         # attachments_addable? -> add_issue_notes OR edit_issues (Redmine's own
         # attach rule), so clients can gate an upload button without proxying.
         'can_add_attachments' => issue.attachments_addable?(user),
+        # time_loggable? -> :log_time plus the closed-issues setting, so a
+        # client can hide time logging instead of collecting a 403 (#89).
+        'can_log_time' => issue.time_loggable?(user),
         'status_transitions' => issue.new_statuses_allowed_to(user).map do |status|
           { 'id' => status.id, 'name' => status.name }
         end,

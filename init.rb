@@ -27,6 +27,7 @@ require_relative 'lib/redmine_gtt_sync/project_bundle'
 require_relative 'lib/redmine_gtt_sync/query_bundle'
 require_relative 'lib/redmine_gtt_sync/change_feed'
 require_relative 'lib/redmine_gtt_sync/project_schema'
+require_relative 'lib/redmine_gtt_sync/time_entries'
 
 # redmine_gtt_sync provides the integration contract that external clients
 # (QTask for QGIS, QField, and OGC clients) use to read and write GTT geometry.

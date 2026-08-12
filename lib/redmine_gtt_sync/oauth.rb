@@ -48,6 +48,8 @@ module RedmineGttSync
       edit_own_issue_notes
       view_private_notes
       set_notes_private
+      view_time_entries
+      log_time
       view_gtt_settings
       use_gtt_sync
     ].freeze

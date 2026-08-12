@@ -76,3 +76,17 @@ get 'gtt_sync/projects/:id/schema',
     to: 'gtt_sync#project_schema',
     as: 'gtt_sync_project_schema',
     defaults: { format: 'json' }
+
+# The authenticated user's own time entries for a date range (?from=&to=,
+# optional project_id / issue_id): powers a "my time today/this week" summary.
+get 'gtt_sync/time_entries',
+    to: 'gtt_sync#time_entries',
+    as: 'gtt_sync_time_entries',
+    defaults: { format: 'json' }
+
+# Log time on an issue as the authenticated user, through safe_attributes and
+# Redmine's own :log_time gate.
+post 'gtt_sync/issues/:id/time_entries',
+     to: 'gtt_sync#create_time_entry',
+     as: 'gtt_sync_issue_time_entries',
+     defaults: { format: 'json' }
