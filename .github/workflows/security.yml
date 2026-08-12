@@ -17,7 +17,7 @@ jobs:
   action-pinning:
     permissions:
       contents: read
-    uses: geolonia/.github/.github/workflows/reusable-pinact-check.yml@82fb51be9f5a20f4e75762bb0cabcfab9ff20a21 # v1.36.0
+    uses: geolonia/.github/.github/workflows/reusable-pinact-check.yml@a7f7ab930920429ec1ea9373ae7325fb769edfcc # v1.37.0
 
   # GitHub Actions static analysis (dangerous triggers, template injection,
   # excessive permissions, credential persistence).
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zizmorcore/zizmor-action@6fc4b006235f201fdab3722e17240ab420d580e5 # v0.6.1
+      - uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
         with:
           # SARIF upload needs GitHub Advanced Security (not on private repos
           # without a license); use workflow annotations instead so behavior is
