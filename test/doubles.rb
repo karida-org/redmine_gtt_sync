@@ -215,6 +215,13 @@ module RedmineGttSync
         end
       end
 
+      # Real: the foreign key behind the assigned_to association, which the
+      # two always agree on. Derived here so a test setting one cannot end up
+      # describing an issue whose id and association disagree.
+      def assigned_to_id
+        @assigned_to&.id
+      end
+
       # The RBAC surface, mirroring the real Issue arities (an optional user
       # argument) so the builders' calls can't drift from the signatures.
       def safe_attribute_names(_user = nil)

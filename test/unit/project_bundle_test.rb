@@ -29,10 +29,11 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
     )
   end
 
-  # A named reference (priority/assignee/category/version) as the summary reads
-  # it: only #name matters.
-  def named(name)
-    NamedRef.new(name: name)
+  # A named reference (priority/assignee/category/version) as the summary
+  # reads it. Only #name matters for most of them; the assignee also carries
+  # its id, so pass one where that is what the test is about.
+  def named(name, id: nil)
+    NamedRef.new(id: id, name: name)
   end
 
   def custom_value(id:, name:, value:, field_format: 'string', multiple: false)
@@ -94,7 +95,7 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
       1,
       geom: factory.point(1.0, 2.0),
       priority: named('High'),
-      assigned_to: named('Alice'),
+      assigned_to: named('Alice', id: 8),
       category: named('Roads'),
       fixed_version: named('v2'),
       start_date: Date.new(2026, 7, 1),
@@ -107,6 +108,10 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
     props = build([built])['issues']['point']['features'][0]['properties']
     assert_equal 'High', props['priority']
     assert_equal 'Alice', props['assigned_to']
+    # The assignee also carries its id: the name renders through the
+    # instance's user_format setting, so it is a label, not an identity a
+    # client can match "assigned to me" on.
+    assert_equal 8, props['assigned_to_id']
     assert_equal 'Roads', props['category']
     assert_equal 'v2', props['fixed_version']
     assert_equal '2026-07-01', props['start_date']
@@ -139,7 +144,7 @@ class RedmineGttSyncProjectBundleTest < ActiveSupport::TestCase
     feature = build([issue(1, geom: factory.point(1.0, 2.0))])['issues']['point']['features'][0]
     props = feature['properties']
     nullable = %w[
-      priority assigned_to category fixed_version
+      priority assigned_to assigned_to_id category fixed_version
       start_date due_date created_on updated_on
     ]
     nullable.each do |key|

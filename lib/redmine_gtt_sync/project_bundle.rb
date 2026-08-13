@@ -78,7 +78,15 @@ module RedmineGttSync
     # priority/assigned_to/category/fixed_version are sent as display NAMES (not
     # ids like status/tracker): the client resolves status and tracker via gtt
     # settings for their colour/icon, but has no client-side lookup for these and
-    # the issue list only needs a label. start_date/due_date/done_ratio/
+    # the issue list only needs a label.
+    #
+    # `assigned_to` also gets its id alongside the name, because the name is the
+    # only one of the four a client compares rather than merely displays ("show
+    # the issues assigned to me"). That comparison cannot be done on the name:
+    # User#name renders through the instance's `user_format` setting, so the same
+    # person reads as "John Smith", "Smith John", "Smith, J." or "jsmith"
+    # depending on configuration, and a client matching on a name it composed
+    # itself would silently find nothing. The id is stable and says who it is. start_date/due_date/done_ratio/
     # estimated_hours and the created_on/updated_on timestamps are literals (ISO
     # for dates/times) so they render and sort directly as optional list columns.
     # All are optional on the client, so an older server that omits them just
@@ -94,6 +102,7 @@ module RedmineGttSync
         'tracker_id' => issue.tracker_id,
         'priority' => issue.priority&.name,
         'assigned_to' => issue.assigned_to&.name,
+        'assigned_to_id' => issue.assigned_to_id,
         'category' => issue.category&.name,
         'fixed_version' => issue.fixed_version&.name,
         'start_date' => issue.start_date&.iso8601,
